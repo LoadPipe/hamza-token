@@ -6,7 +6,7 @@ test = "test-foundry"
 
 [rpc_endpoints]
 mainnet = "https://mainnet.infura.io/v3/${process.env.SEPOLIA_API_KEY}"
-sepolia = "https://sepolia.infura.io/v3/${process.env.SEPOLIA_API_KEY}"
+sepolia = "https://rpc.ankr.com/eth_sepolia"
 op_sepolia = "https://sepolia.optimism.io"
 op_mainnet = "https://mainnet.optimism.io"
 
