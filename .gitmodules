@@ -1,0 +1,3 @@
+[submodule "lib/Baal"]
+	path = lib/Baal
+	url = https://github.com/HausDAO/Baal
