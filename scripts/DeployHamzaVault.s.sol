@@ -4,13 +4,14 @@ pragma solidity ^0.8.17;
 import "forge-std/Script.sol";
 
 import "@baal/Baal.sol";
+import "@baal/BaalSummoner.sol";
 
 contract DeployHamzaVault is Script {
     // (A) Deployed BaalSummoner on Sepolia
     address constant BAAL_SUMMONER = 0xB2B3909661552942AE1115E9Fc99dF0BC93d71d0;
 
     // (B) Admin multisig address
-    address constant ADMIN_MULTISIG = 0xAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAa;
+    address constant ADMIN_MULTISIG = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4; // random address
 
     //-------------------------------------------------------------------------
     // Deploy & configure the DAO
@@ -53,7 +54,7 @@ contract DeployHamzaVault is Script {
         );
 
         // Create a dynamic array of actions
-        bytes;
+        bytes[] memory initActions = new bytes[](2);
         initActions[0] = mintSharesCall;
         initActions[1] = unpauseLootCall;
 
@@ -70,13 +71,13 @@ contract DeployHamzaVault is Script {
     }
     // Helper Functions
     function _singleAddressArray(address _addr) private pure returns (address[] memory) {
-        address;
+        address[] memory arr = new address[](1);
         arr[0] = _addr;
         return arr;
     }
 
     function _singleUint256Array(uint256 _val) private pure returns (uint256[] memory) {
-        uint256;
+        uint256[] memory arr = new uint256[](1);
         arr[0] = _val;
         return arr;
     }

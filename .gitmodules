@@ -13,3 +13,6 @@
 [submodule "lib/zodiac"]
 	path = lib/zodiac
 	url = https://github.com/gnosis/zodiac
+[submodule "lib/gsn"]
+	path = lib/gsn
+	url = https://github.com/OpenGSN/gsn

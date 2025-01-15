@@ -1,3 +1,6 @@
 @baal/=lib/baal/contracts
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+@gnosis.pm/safe-contracts/=lib/safe-contracts/
+@gnosis.pm/zodiac/=lib/zodiac/
+@opengsn/=lib/gsn/packages/
