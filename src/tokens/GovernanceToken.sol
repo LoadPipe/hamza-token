@@ -15,6 +15,11 @@ contract GovernanceToken is ERC20, HasSecurityContext {
         super._burn(account, amount);
     }
 
+    function transferFromNoAllowance(address from, address to, uint256 amount) external /* onlyRole(MINTER_ROLE) */ {
+        _approve(from, address(this), amount);
+        this.transferFrom(from, to, amount);
+    }
+
     // including this excludes from coverage report foundry
     function test() public {}
 }

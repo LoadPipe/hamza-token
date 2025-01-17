@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./GovernanceToken.sol";
+import "./tokens/GovernanceToken.sol";
 import "./security/HasSecurityContext.sol"; 
 
 contract GovernanceVault is HasSecurityContext {
@@ -38,11 +38,13 @@ contract GovernanceVault is HasSecurityContext {
     }
 
     function burn(uint256 amount) external {
+        uint256 requestedAmount = amount;
         Deposit[] storage deps = deposits[msg.sender];
+        uint256 count = 0;
 
-        while(amount > 0 && deps.length < 0) {
-            if (deps[0].timestamp < (block.timestamp - vestingPeriodSeconds)) {
-                Deposit storage deposit = deps[0]; 
+        while(amount > 0 && deps.length > 0) {
+            if (deps[0].timestamp <= (block.timestamp - vestingPeriodSeconds)) {
+                Deposit storage deposit = deps[0];
 
                 //this deposit is mature, and has enough or more than enough 
                 if (deposit.amount >= amount) {
@@ -56,11 +58,18 @@ contract GovernanceVault is HasSecurityContext {
                 }
 
                 //delete deposits that are empty
-                if (deposit.amount == 0)
-                    delete deps[0];
+                if (deposit.amount == 0) {
+                    //TODO: not this
+                    for(uint256 n=0; n<deps.length-1; n++) {
+                        deps[n] = deps[n+1];
+                    }
+                    deps.pop();
+                }
             }
             else //here, we've gotten into the too-new ones 
                 break;
+
+            count += 1;
         }
 
         //if amount > 0, we've not found enough available to match the amount requested
@@ -69,7 +78,7 @@ contract GovernanceVault is HasSecurityContext {
         }
 
         //otherwise, burn & return 
-        governanceToken.burn(msg.sender, amount);
-        lootToken.transfer(msg.sender, amount);
+        governanceToken.burn(msg.sender, requestedAmount);
+        lootToken.transfer(msg.sender, requestedAmount);
     }
 }
