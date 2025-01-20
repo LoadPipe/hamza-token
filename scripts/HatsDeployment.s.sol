@@ -4,35 +4,35 @@ pragma solidity ^0.8.19;
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
+// Minimal interface to read the Gnosis Safe's nonce.
+interface IGnosisSafe {
+    function nonce() external view returns (uint256);
+}
+
 // Hats Protocol
 import { Hats } from "@hats-protocol/Hats.sol";
-
-// Hats modules
 import { EligibilityModule } from "../src/security/hats/EligibilityModule.sol";
 import { ToggleModule } from "../src/security/hats/ToggleModule.sol";
-
-// Security context & system
 import { HatsSecurityContext } from "../src/security/HatsSecurityContext.sol";
 import { IHatsSecurityContext } from "../src/security/IHatsSecurityContext.sol";
-
-// Roles
 import { Roles } from "../src/security/Roles.sol";
 
 import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
 
-
+/**
+ * @title HatsDeployment
+ * @notice Script to deploy the Hats protocol contracts and safe
+ */
 contract HatsDeployment is Script {
-    // (B) Gnosis Safe singleton & factory on Sepolia
+
+    // Gnosis Safe singleton & factory on Sepolia
     address constant SAFE_SINGLETON = 0x69f4D1788e39c87893C980c06EdF4b7f686e2938;
     address constant SAFE_FACTORY  = 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC;
 
-    address public adminAddress1   = 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8;
-    address public adminAddress2 = 0x1542612fee591eD35C05A3E980bAB325265c06a3;    // The admin address
-    address public vaultAddress   = address(0x11);     // The vault that will receive fees
-    address public arbiterAddress = address(0x12);     // The arbiter address
-    address public daoAddress     = address(0x13);     // The DAO address
-    bool    internal autoRelease    = true;             // Whether PaymentEscrow starts with autoRelease
+    // The second owner (besides adminAddress1)
+    address public adminAddress2 = 0x1542612fee591eD35C05A3E980bAB325265c06a3; // hudson's address: 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8
 
+    // Hats references
     Hats public hats;
     EligibilityModule public eligibilityModule;
     ToggleModule public toggleModule;
@@ -42,164 +42,369 @@ contract HatsDeployment is Script {
     uint256 public arbiterHatId;
     uint256 public daoHatId;
     uint256 public topHatId;
-    
+    uint256 public systemHatId;
+    uint256 public pauserHatId;
+
+    // Deployer's private key and derived addresses
+    uint256 internal deployerPk;
+    address internal adminAddress1;
 
     function run() external {
-        vm.startBroadcast(adminAddress1);
-        console.log("Starting Hats deployment");
+        // 1) load deployer private key
+        deployerPk = vm.envUint("PRIVATE_KEY");
+        adminAddress1 = vm.addr(deployerPk);
+        vm.startBroadcast(deployerPk);
 
-        hats = Hats(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137);// this is the hats contract on all chains
+        console.log("Deployer EOA (adminAddress1):", adminAddress1);
+        console.log("Starting Hats deployment with v=1 (approved hash) signatures...");
+
+       
+        // 2) Use existing Hats or deploy a new instance
+        hats = Hats(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137);
         //hats = new Hats("Hats Protocol v1", "ipfs://bafkreiflezpk3kjz6zsv23pbvowtatnd5hmqfkdro33x5mh2azlhne3ah4"); 
         //use this just for amoy. the above address is on polygon and base
 
-        // 1. Deploy admin Gnosis Safe
+        
+        // 3) Deploy a new Gnosis Safe (1-of-2 owners)
         GnosisSafeProxyFactory factory = GnosisSafeProxyFactory(SAFE_FACTORY);
-
         address[] memory owners = new address[](2);
+        // The script must broadcast from adminAddress1
         owners[0] = adminAddress1;
         owners[1] = adminAddress2;
 
         bytes memory setupData = abi.encodeWithSignature(
             "setup(address[],uint256,address,bytes,address,address,uint256,address)",
-            owners,      // Owners array
-            1,           // Threshold (1-of-2)
-            address(0),  // No `to` delegate call
-            "",          // No `data`
-            address(0),  // No fallback handler
-            address(0),  // No payment token
-            0,           // Payment = 0
-            address(0)   // No payment receiver
+            owners,
+            1,        // threshold = 1
+            address(0),
+            "",
+            address(0),
+            address(0),
+            0,
+            address(0)
         );
 
-        address safeAddr = address(factory.createProxy(
-            SAFE_SINGLETON,
-            setupData
-        ));
+        address safeAddr = address(factory.createProxy(SAFE_SINGLETON, setupData));
+        console.log("Gnosis Safe deployed at:", safeAddr);
 
-        vm.stopBroadcast();
-        vm.startBroadcast(safeAddr);
-
-        // 2. Deploy Eligibility & Toggle Modules 
-        // pass admin address to each module’s constructor
+       
+        // 4) Deploy Eligibility & Toggle modules
         eligibilityModule = new EligibilityModule(safeAddr);
-        toggleModule = new ToggleModule(safeAddr);
+        toggleModule      = new ToggleModule(safeAddr);
 
-        // 3. Mint the Top Hat to admin 
+        console.log("EligibilityModule at:", address(eligibilityModule));
+        console.log("ToggleModule at:     ", address(toggleModule));
 
-        // details in json format uploaded to IPFS
-        // {"type":"1.0","data":{"name":"sxxs","description":"xssxsxsx"}}
-        adminHatId = hats.mintTopHat(
-        safeAddr,
-        "ipfs://bafkreih3vqseitn7pijlkl2jcawbjrhae3dfb2pakqtgd4epvxxfulwoqq", //from ipfs/admin.json
-        ""
-        );
+        // 5) Mint Top Hat to the Safe (via the Safe)
+        {
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintTopHat.selector,
+                safeAddr,
+                "ipfs://bafkreih3vqseitn7pijlkl2jcawbjrhae3dfb2pakqtgd4epvxxfulwoqq",
+                ""
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+        }
+        adminHatId = uint256(hats.lastTopHatId()) << 224;
+        console.log("adminHatId (TopHat) =", adminHatId);
 
-        // 4. Create child hats
+       
+        // 6) Create child Hats
 
-        // adminHatId = hats.createHat(
-        // topHatId,
-        // "ipfs://bafkreih3vqseitn7pijlkl2jcawbjrhae3dfb2pakqtgd4epvxxfulwoqq", //from ipfs/admin.json
-        // 2,                      // maxSupply
-        // address(eligibilityModule),
-        // address(toggleModule),
-        // true,                   // mutable
-        // ""// no image 
-        // );
-
-        arbiterHatId = hats.createHat(
-            adminHatId,
-            "ipfs://bafkreicbhbvddt2f475inukntzh6n72ehm4iyljstyyjsmizdsojmbdase", //from ipfs/arbiter.json
-            2,                      // maxSupply
-            address(eligibilityModule),
-            address(toggleModule),
-            true,                   // mutable
-            ""// no image 
-        );
-
-        daoHatId = hats.createHat(
-            adminHatId,
-            "ipfs://bafkreic2f5b6ykdvafs5nhkouruvlql73caou5etgdrx67yt6ofp6pwf24", //from ipfs/dao.json
-            2, 
-            address(eligibilityModule),
-            address(toggleModule),
-            true, 
-            ""
-        );
-
-        uint256 systemHatId = hats.createHat(
-            adminHatId,
-            "ipfs://bafkreie2vxohaw7cneknlwv6hq7h4askkv6jfcadho6efz5bxfx66fqu3q", //from ipfs/system.json
-            2, 
-            address(eligibilityModule),
-            address(toggleModule),
-            true, 
-            ""
-        );
-
-        uint256 pauserHatId = hats.createHat(
-            adminHatId,
-            "ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw4", //from ipfs/pauser.json
-            2, 
-            address(eligibilityModule),
-            address(toggleModule),
-            true, 
-            ""
-        );
+        // Arbiter
+        {
+            arbiterHatId = hats.getNextId(adminHatId);
+        
+            bytes memory data = abi.encodeWithSelector(
+                Hats.createHat.selector,
+                adminHatId,
+                "ipfs://bafkreicbhbvddt2f475inukntzh6n72ehm4iyljstyyjsmizdsojmbdase",
+                uint32(2),
+                address(eligibilityModule),
+                address(toggleModule),
+                true,
+                ""
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+        }
+            
+        // DAO
+        {
+            daoHatId = hats.getNextId(adminHatId);
+            bytes memory data = abi.encodeWithSelector(
+                Hats.createHat.selector,
+                adminHatId,
+                "ipfs://bafkreic2f5b6ykdvafs5nhkouruvlql73caou5etgdrx67yt6ofp6pwf24",
+                uint32(2),
+                address(eligibilityModule),
+                address(toggleModule),
+                true,
+                ""
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            
+        }
+        // System
+        {
+            systemHatId = hats.getNextId(adminHatId);
+            bytes memory data = abi.encodeWithSelector(
+                Hats.createHat.selector,
+                adminHatId,
+                "ipfs://bafkreie2vxohaw7cneknlwv6hq7h4askkv6jfcadho6efz5bxfx66fqu3q",
+                uint32(2),
+                address(eligibilityModule),
+                address(toggleModule),
+                true,
+                ""
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            
+        }
+        // Pauser
+        {
+            pauserHatId = hats.getNextId(adminHatId);
+            bytes memory data = abi.encodeWithSelector(
+                Hats.createHat.selector,
+                adminHatId,
+                "ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw4",
+                uint32(2),
+                address(eligibilityModule),
+                address(toggleModule),
+                true,
+                ""
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+           
+        }
 
         console.log("Arbiter Hat ID:", arbiterHatId);
-        console.log("DAO Hat ID:", daoHatId);
-        console.log("System Hat ID:", systemHatId);
-        console.log("Pauser Hat ID:", pauserHatId);
+        console.log("DAO Hat ID:    ", daoHatId);
+        console.log("System Hat ID: ", systemHatId);
+        console.log("Pauser Hat ID: ", pauserHatId);
 
-        // 5. Deploy HatsSecurityContext & set role hats
-        securityContext = new HatsSecurityContext(
-            address(hats),
-            adminHatId
-        );
+        // 7) Deploy HatsSecurityContext & set role hats
+        securityContext = new HatsSecurityContext(address(hats), adminHatId);
+        console.log("HatsSecurityContext at:", address(securityContext));
 
-        // 6. Set the eligibility and toggle module
-        eligibilityModule.setHatRules(adminHatId, true, true);
-        eligibilityModule.setHatRules(arbiterHatId, true, true);
-        eligibilityModule.setHatRules(daoHatId, true, true);
-        eligibilityModule.setHatRules(systemHatId, true, true);
-        eligibilityModule.setHatRules(pauserHatId, true, true);
+        // 8) Configure eligibility + toggle modules
+        {
+            // Set hat rules for each
+            bytes memory data = abi.encodeWithSelector(
+                EligibilityModule.setHatRules.selector,
+                adminHatId,
+                true,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
 
-        toggleModule.setHatStatus(adminHatId, true);
-        toggleModule.setHatStatus(arbiterHatId, true);
-        toggleModule.setHatStatus(daoHatId, true);
-        toggleModule.setHatStatus(systemHatId, true);
-        toggleModule.setHatStatus(pauserHatId, true);
+            data = abi.encodeWithSelector(
+                EligibilityModule.setHatRules.selector,
+                arbiterHatId,
+                true,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
 
-        // 7. Mint the hats to the respective addresses
-        // Mint the arbiter hat to the arbiter address
-        hats.mintHat(arbiterHatId, adminAddress1);
-        hats.mintHat(arbiterHatId, adminAddress2);
+            data = abi.encodeWithSelector(
+                EligibilityModule.setHatRules.selector,
+                daoHatId,
+                true,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
 
-        // Mint the DAO hat to the DAO address
-        hats.mintHat(daoHatId, adminAddress1);
-        hats.mintHat(daoHatId, adminAddress2);
+            data = abi.encodeWithSelector(
+                EligibilityModule.setHatRules.selector,
+                systemHatId,
+                true,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
 
-        // Mint the system hat to the admin address
-        hats.mintHat(systemHatId, adminAddress1);
-        hats.mintHat(systemHatId, adminAddress2);
+            data = abi.encodeWithSelector(
+                EligibilityModule.setHatRules.selector,
+                pauserHatId,
+                true,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
+        }
+        {
+            // Toggle hat "active"
+            bytes memory data = abi.encodeWithSelector(
+                ToggleModule.setHatStatus.selector,
+                adminHatId,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
 
+            data = abi.encodeWithSelector(
+                ToggleModule.setHatStatus.selector,
+                arbiterHatId,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
 
-        // Mint the pauser hat to the admin address
-        hats.mintHat(pauserHatId, adminAddress1);
-        hats.mintHat(pauserHatId, adminAddress2);
+            data = abi.encodeWithSelector(
+                ToggleModule.setHatStatus.selector,
+                daoHatId,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
 
-        // Map each role to the correct hat
-        securityContext.setRoleHat(Roles.ARBITER_ROLE, arbiterHatId);
-        securityContext.setRoleHat(Roles.DAO_ROLE,     daoHatId);
-        securityContext.setRoleHat(Roles.SYSTEM_ROLE,  systemHatId);
-        securityContext.setRoleHat(Roles.PAUSER_ROLE,  pauserHatId);
+            data = abi.encodeWithSelector(
+                ToggleModule.setHatStatus.selector,
+                systemHatId,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
+
+            data = abi.encodeWithSelector(
+                ToggleModule.setHatStatus.selector,
+                pauserHatId,
+                true
+            );
+            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
+        }
+
+        // 9) Mint hats to relevant addresses
+        {
+            // Arbiter
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                arbiterHatId,
+                adminAddress1
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+
+            data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                arbiterHatId,
+                adminAddress2
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+        }
+        {
+            // DAO
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                daoHatId,
+                adminAddress1
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+
+            data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                daoHatId,
+                adminAddress2
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+        }
+        {
+            // System
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                systemHatId,
+                adminAddress1
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+
+            data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                systemHatId,
+                adminAddress2
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+        }
+        {
+            // Pauser
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                pauserHatId,
+                adminAddress1
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+
+            data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                pauserHatId,
+                adminAddress2
+            );
+            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+        }
+
+        // 10) Set role hats in the HatsSecurityContext
+        {
+            bytes memory data = abi.encodeWithSelector(
+                HatsSecurityContext.setRoleHat.selector,
+                Roles.ARBITER_ROLE,
+                arbiterHatId
+            );
+            execTransactionFromSafe(safeAddr, address(securityContext), 0, data);
+
+            data = abi.encodeWithSelector(
+                HatsSecurityContext.setRoleHat.selector,
+                Roles.DAO_ROLE,
+                daoHatId
+            );
+            execTransactionFromSafe(safeAddr, address(securityContext), 0, data);
+
+            data = abi.encodeWithSelector(
+                HatsSecurityContext.setRoleHat.selector,
+                Roles.SYSTEM_ROLE,
+                systemHatId
+            );
+            execTransactionFromSafe(safeAddr, address(securityContext), 0, data);
+
+            data = abi.encodeWithSelector(
+                HatsSecurityContext.setRoleHat.selector,
+                Roles.PAUSER_ROLE,
+                pauserHatId
+            );
+            execTransactionFromSafe(safeAddr, address(securityContext), 0, data);
+        }
 
         vm.stopBroadcast();
 
+        console.log("-----------------------------------------------");
         console.log("Hats deployed at:             ", address(hats));
         console.log("EligibilityModule deployed at:", address(eligibilityModule));
         console.log("ToggleModule deployed at:     ", address(toggleModule));
-        console.log("safeAddr deployed at:         ", safeAddr);
         console.log("HatsSecurityContext deployed: ", address(securityContext));
+        console.log("Finished Hats deployment script with v=1 signatures.");
+        console.log("-----------------------------------------------");
+    }
+
+    // Helper function to execute a Safe transaction
+    function execTransactionFromSafe(
+        address _safe,
+        address _to,
+        uint256 _value,
+        bytes memory _data
+    ) internal {
+        // Then Gnosis Safe checks if msg.sender == r => pass because v=1
+        bytes memory signature = abi.encodePacked(
+            bytes32(uint256(uint160(adminAddress1))), // r
+            bytes32(0),                               // s
+            bytes1(0x01)                              // v=1
+        );
+
+        // Prepare the Safe call data
+        bytes memory safeTxData = abi.encodeWithSignature(
+            "execTransaction(address,uint256,bytes,uint8,uint256,uint256,uint256,address,address,bytes)",
+            _to,
+            _value,
+            _data,
+            uint8(0), // operation = CALL
+            0,        // safeTxGas
+            0,        // baseGas
+            0,        // gasPrice
+            address(0),
+            address(0),
+            signature
+        );
+
+        (bool success, ) = _safe.call(safeTxData);
+        require(success, "Safe transaction failed");
     }
 }
