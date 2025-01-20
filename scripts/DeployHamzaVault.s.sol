@@ -44,8 +44,7 @@ contract DeployHamzaVault is Script {
             address(0),  // No fallback handler
             address(0),  // No payment token
             0,           // Payment = 0
-            address(0),   // No payment receiver
-            address(vault) //community vault
+            address(0)   // No payment receiver
         );
 
         address safeAddr = address(factory.createProxy(
@@ -65,6 +64,7 @@ contract DeployHamzaVault is Script {
         address _forwarder       = address(0);
         address _lootToken       = address(0);
         address _sharesToken     = address(0);
+        address _communityVault  = address(vault);
 
         bytes memory initParams = abi.encode(
             name,
@@ -72,7 +72,8 @@ contract DeployHamzaVault is Script {
             address(0), //setups safe 
             _forwarder,
             _lootToken,
-            _sharesToken
+            _sharesToken,
+            _communityVault
         );
 
         // STEP 4: Create initialization actions
@@ -121,7 +122,7 @@ contract DeployHamzaVault is Script {
         initActions[3] = mintLootCall;
 
         // STEP 5: Summon a new Baal DAO
-        address newBaalAddr = summoner.summonBaal(initParams, initActions, 5);
+        address newBaalAddr = summoner.summonBaal(initParams, initActions, 6);
         console.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
 
         vm.stopBroadcast();
