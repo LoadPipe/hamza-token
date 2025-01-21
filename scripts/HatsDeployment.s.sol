@@ -4,6 +4,8 @@ pragma solidity ^0.8.19;
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
+import { SafeTransactionHelper } from "./utils/SafeTransactionHelper.s.sol";
+
 // Minimal interface to read the Gnosis Safe's nonce.
 interface IGnosisSafe {
     function nonce() external view returns (uint256);
@@ -52,10 +54,14 @@ contract HatsDeployment is Script {
     uint256 internal deployerPk;
     address internal adminAddress1;
 
+    function execTransaction(address to, address target, uint256 value, bytes memory data) internal {
+        SafeTransactionHelper.execTransaction(to, target, value, data, adminAddress1);
+    }
+
     /**
      * @notice Runs the deployment. Returns the newly deployed safe address
      */
-    function run() external returns (address) {
+    function run() external returns (address, address) {
         // 1) load deployer private key
         deployerPk = vm.envUint("PRIVATE_KEY");
         adminAddress1 = vm.addr(deployerPk);
@@ -105,7 +111,7 @@ contract HatsDeployment is Script {
                 "ipfs://bafkreih3vqseitn7pijlkl2jcawbjrhae3dfb2pakqtgd4epvxxfulwoqq",
                 ""
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
         }
         adminHatId = uint256(hats.lastTopHatId()) << 224;
         console.log("adminHatId (TopHat) =", adminHatId);
@@ -125,7 +131,7 @@ contract HatsDeployment is Script {
                 true,
                 ""
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
         }
             
         // DAO
@@ -141,7 +147,7 @@ contract HatsDeployment is Script {
                 true,
                 ""
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
         }
 
         // System
@@ -157,7 +163,7 @@ contract HatsDeployment is Script {
                 true,
                 ""
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
         }
 
         // Pauser
@@ -173,7 +179,7 @@ contract HatsDeployment is Script {
                 true,
                 ""
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
         }
 
         console.log("Arbiter Hat ID:", arbiterHatId);
@@ -194,7 +200,7 @@ contract HatsDeployment is Script {
                 true,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
+            execTransaction(safeAddr, address(eligibilityModule), 0, data);
 
             data = abi.encodeWithSelector(
                 EligibilityModule.setHatRules.selector,
@@ -202,7 +208,7 @@ contract HatsDeployment is Script {
                 true,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
+            execTransaction(safeAddr, address(eligibilityModule), 0, data);
 
             data = abi.encodeWithSelector(
                 EligibilityModule.setHatRules.selector,
@@ -210,7 +216,7 @@ contract HatsDeployment is Script {
                 true,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
+            execTransaction(safeAddr, address(eligibilityModule), 0, data);
 
             data = abi.encodeWithSelector(
                 EligibilityModule.setHatRules.selector,
@@ -218,7 +224,7 @@ contract HatsDeployment is Script {
                 true,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
+            execTransaction(safeAddr, address(eligibilityModule), 0, data);
 
             data = abi.encodeWithSelector(
                 EligibilityModule.setHatRules.selector,
@@ -226,7 +232,7 @@ contract HatsDeployment is Script {
                 true,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(eligibilityModule), 0, data);
+            execTransaction(safeAddr, address(eligibilityModule), 0, data);
         }
         {
             // Toggle hat "active"
@@ -235,35 +241,35 @@ contract HatsDeployment is Script {
                 adminHatId,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
+            execTransaction(safeAddr, address(toggleModule), 0, data);
 
             data = abi.encodeWithSelector(
                 ToggleModule.setHatStatus.selector,
                 arbiterHatId,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
+            execTransaction(safeAddr, address(toggleModule), 0, data);
 
             data = abi.encodeWithSelector(
                 ToggleModule.setHatStatus.selector,
                 daoHatId,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
+            execTransaction(safeAddr, address(toggleModule), 0, data);
 
             data = abi.encodeWithSelector(
                 ToggleModule.setHatStatus.selector,
                 systemHatId,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
+            execTransaction(safeAddr, address(toggleModule), 0, data);
 
             data = abi.encodeWithSelector(
                 ToggleModule.setHatStatus.selector,
                 pauserHatId,
                 true
             );
-            execTransactionFromSafe(safeAddr, address(toggleModule), 0, data);
+            execTransaction(safeAddr, address(toggleModule), 0, data);
         }
 
         // 9) Mint hats to relevant addresses
@@ -274,14 +280,14 @@ contract HatsDeployment is Script {
                 arbiterHatId,
                 adminAddress1
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
 
             data = abi.encodeWithSelector(
                 Hats.mintHat.selector,
                 arbiterHatId,
                 adminAddress2
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
         }
         {
             // DAO
@@ -290,14 +296,14 @@ contract HatsDeployment is Script {
                 daoHatId,
                 adminAddress1
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
 
             data = abi.encodeWithSelector(
                 Hats.mintHat.selector,
                 daoHatId,
                 adminAddress2
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
         }
         {
             // System
@@ -306,14 +312,14 @@ contract HatsDeployment is Script {
                 systemHatId,
                 adminAddress1
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
 
             data = abi.encodeWithSelector(
                 Hats.mintHat.selector,
                 systemHatId,
                 adminAddress2
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
         }
         {
             // Pauser
@@ -322,14 +328,14 @@ contract HatsDeployment is Script {
                 pauserHatId,
                 adminAddress1
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
 
             data = abi.encodeWithSelector(
                 Hats.mintHat.selector,
                 pauserHatId,
                 adminAddress2
             );
-            execTransactionFromSafe(safeAddr, address(hats), 0, data);
+            execTransaction(safeAddr, address(hats), 0, data);
         }
 
         // 10) Set role hats in the HatsSecurityContext
@@ -339,28 +345,28 @@ contract HatsDeployment is Script {
                 Roles.ARBITER_ROLE,
                 arbiterHatId
             );
-            execTransactionFromSafe(safeAddr, address(securityContext), 0, data);
+            execTransaction(safeAddr, address(securityContext), 0, data);
 
             data = abi.encodeWithSelector(
                 HatsSecurityContext.setRoleHat.selector,
                 Roles.DAO_ROLE,
                 daoHatId
             );
-            execTransactionFromSafe(safeAddr, address(securityContext), 0, data);
+            execTransaction(safeAddr, address(securityContext), 0, data);
 
             data = abi.encodeWithSelector(
                 HatsSecurityContext.setRoleHat.selector,
                 Roles.SYSTEM_ROLE,
                 systemHatId
             );
-            execTransactionFromSafe(safeAddr, address(securityContext), 0, data);
+            execTransaction(safeAddr, address(securityContext), 0, data);
 
             data = abi.encodeWithSelector(
                 HatsSecurityContext.setRoleHat.selector,
                 Roles.PAUSER_ROLE,
                 pauserHatId
             );
-            execTransactionFromSafe(safeAddr, address(securityContext), 0, data);
+            execTransaction(safeAddr, address(securityContext), 0, data);
         }
 
         vm.stopBroadcast();
@@ -375,37 +381,6 @@ contract HatsDeployment is Script {
         console.log("-----------------------------------------------");
 
         // Return the newly deployed safe address to the caller script
-        return deployedSafe;
-    }
-
-    // Helper function to execute a Safe transaction
-    function execTransactionFromSafe(
-        address _safe,
-        address _to,
-        uint256 _value,
-        bytes memory _data
-    ) internal {
-        bytes memory signature = abi.encodePacked(
-            bytes32(uint256(uint160(adminAddress1))), // r
-            bytes32(0),                               // s
-            bytes1(0x01)                              // v=1
-        );
-
-        bytes memory safeTxData = abi.encodeWithSignature(
-            "execTransaction(address,uint256,bytes,uint8,uint256,uint256,uint256,address,address,bytes)",
-            _to,
-            _value,
-            _data,
-            uint8(0), // operation = CALL
-            0,        // safeTxGas
-            0,        // baseGas
-            0,        // gasPrice
-            address(0),
-            address(0),
-            signature
-        );
-
-        (bool success, ) = _safe.call(safeTxData);
-        require(success, "Safe transaction failed");
+        return(deployedSafe, address(securityContext));
     }
 }

@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./security/HasSecurityContext.sol"; 
+import "./security/Roles.sol";
+import "./security/IHatsSecurityContext.sol";         
 
-contract CommunityVault is Ownable {
+/**
+ * @title CommunityVault
+ * @dev A vault for holding and distributing community funds, with Hats-based role control.
+ */
+contract CommunityVault is HasSecurityContext {
     using SafeERC20 for IERC20;
 
     // Mapping to store token balances held in the community vault
@@ -14,6 +20,15 @@ contract CommunityVault is Ownable {
     event Deposit(address indexed token, address indexed from, uint256 amount);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event Distribute(address indexed token, address indexed to, uint256 amount);
+
+    /**
+     * @dev Constructor to initialize the security context.
+     * @param _securityContext Address of the HatsSecurityContext contract.
+     */
+    constructor(address _securityContext) {
+        if (address(_securityContext) == address(0)) revert ZeroAddressArgument();
+        _setSecurityContext(IHatsSecurityContext(_securityContext));
+    }
 
     /**
      * @dev Deposit tokens into the community vault
@@ -40,7 +55,7 @@ contract CommunityVault is Ownable {
      * @param to The address to send the tokens or ETH to
      * @param amount The amount to withdraw
      */
-    function withdraw(address token, address to, uint256 amount) external onlyOwner {
+    function withdraw(address token, address to, uint256 amount) external onlyRole(Roles.ADMIN_ROLE) {
         require(tokenBalances[token] >= amount, "Insufficient balance");
 
         if (token == address(0)) {
@@ -67,7 +82,7 @@ contract CommunityVault is Ownable {
         address token,
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) external onlyOwner {
+    ) external onlyRole(Roles.ADMIN_ROLE) {
         require(recipients.length == amounts.length, "Mismatched arrays");
 
         for (uint256 i = 0; i < recipients.length; i++) {

@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-// import "forge-std/Script.sol";
-
-// We import the previously defined contract
 import "./HatsDeployment.s.sol";
 
 import "@baal/Baal.sol";
@@ -30,7 +27,7 @@ contract DeployHamzaVault is Script {
 
         // 1) Deploy all hats + new Gnosis Safe
         HatsDeployment hatsDeployment = new HatsDeployment();
-        address safeAddr = hatsDeployment.run(); 
+        (address safeAddr, address hatsSecurityContextAddr) = hatsDeployment.run();
 
         console.log("Using Safe from HatsDeployment at:", safeAddr);
 
@@ -39,7 +36,8 @@ contract DeployHamzaVault is Script {
 
 
         // 2) Deploy the Community Vault
-        CommunityVault vault = new CommunityVault();
+        CommunityVault vault = new CommunityVault(hatsSecurityContextAddr);
+
         console.log("CommunityVault deployed at:", address(vault));
 
         // 3) Summon the Baal DAO
@@ -108,7 +106,7 @@ contract DeployHamzaVault is Script {
         initActions[3] = mintLootCall;
 
         // 5) Summon Baal
-        address newBaalAddr = summoner.summonBaal(initParams, initActions, 7);
+        address newBaalAddr = summoner.summonBaal(initParams, initActions, 8);
         console.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
 
         vm.stopBroadcast();
