@@ -32,6 +32,9 @@ contract HatsDeployment is Script {
     // The second owner (besides adminAddress1)
     address public adminAddress2 = 0x1542612fee591eD35C05A3E980bAB325265c06a3; // hudson's address: 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8
 
+    // The newly deployed Safe
+    address public deployedSafe;
+
     // Hats references
     Hats public hats;
     EligibilityModule public eligibilityModule;
@@ -49,7 +52,10 @@ contract HatsDeployment is Script {
     uint256 internal deployerPk;
     address internal adminAddress1;
 
-    function run() external {
+    /**
+     * @notice Runs the deployment. Returns the newly deployed safe address
+     */
+    function run() external returns (address) {
         // 1) load deployer private key
         deployerPk = vm.envUint("PRIVATE_KEY");
         adminAddress1 = vm.addr(deployerPk);
@@ -58,17 +64,13 @@ contract HatsDeployment is Script {
         console.log("Deployer EOA (adminAddress1):", adminAddress1);
         console.log("Starting Hats deployment with v=1 (approved hash) signatures...");
 
-       
         // 2) Use existing Hats or deploy a new instance
         hats = Hats(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137);
-        //hats = new Hats("Hats Protocol v1", "ipfs://bafkreiflezpk3kjz6zsv23pbvowtatnd5hmqfkdro33x5mh2azlhne3ah4"); 
-        //use this just for amoy. the above address is on polygon and base
+        // hats = new Hats("Hats Protocol v1", "ipfs://...");
 
-        
         // 3) Deploy a new Gnosis Safe (1-of-2 owners)
         GnosisSafeProxyFactory factory = GnosisSafeProxyFactory(SAFE_FACTORY);
         address[] memory owners = new address[](2);
-        // The script must broadcast from adminAddress1
         owners[0] = adminAddress1;
         owners[1] = adminAddress2;
 
@@ -86,8 +88,8 @@ contract HatsDeployment is Script {
 
         address safeAddr = address(factory.createProxy(SAFE_SINGLETON, setupData));
         console.log("Gnosis Safe deployed at:", safeAddr);
+        deployedSafe = safeAddr;
 
-       
         // 4) Deploy Eligibility & Toggle modules
         eligibilityModule = new EligibilityModule(safeAddr);
         toggleModule      = new ToggleModule(safeAddr);
@@ -108,13 +110,11 @@ contract HatsDeployment is Script {
         adminHatId = uint256(hats.lastTopHatId()) << 224;
         console.log("adminHatId (TopHat) =", adminHatId);
 
-       
         // 6) Create child Hats
 
         // Arbiter
         {
             arbiterHatId = hats.getNextId(adminHatId);
-        
             bytes memory data = abi.encodeWithSelector(
                 Hats.createHat.selector,
                 adminHatId,
@@ -142,8 +142,8 @@ contract HatsDeployment is Script {
                 ""
             );
             execTransactionFromSafe(safeAddr, address(hats), 0, data);
-            
         }
+
         // System
         {
             systemHatId = hats.getNextId(adminHatId);
@@ -158,8 +158,8 @@ contract HatsDeployment is Script {
                 ""
             );
             execTransactionFromSafe(safeAddr, address(hats), 0, data);
-            
         }
+
         // Pauser
         {
             pauserHatId = hats.getNextId(adminHatId);
@@ -174,7 +174,6 @@ contract HatsDeployment is Script {
                 ""
             );
             execTransactionFromSafe(safeAddr, address(hats), 0, data);
-           
         }
 
         console.log("Arbiter Hat ID:", arbiterHatId);
@@ -188,7 +187,7 @@ contract HatsDeployment is Script {
 
         // 8) Configure eligibility + toggle modules
         {
-            // Set hat rules for each
+            // Hat rules
             bytes memory data = abi.encodeWithSelector(
                 EligibilityModule.setHatRules.selector,
                 adminHatId,
@@ -371,8 +370,12 @@ contract HatsDeployment is Script {
         console.log("EligibilityModule deployed at:", address(eligibilityModule));
         console.log("ToggleModule deployed at:     ", address(toggleModule));
         console.log("HatsSecurityContext deployed: ", address(securityContext));
-        console.log("Finished Hats deployment script with v=1 signatures.");
+        console.log("Gnosis Safe deployed at:      ", deployedSafe);
+        console.log("Finished Hats deployment script");
         console.log("-----------------------------------------------");
+
+        // Return the newly deployed safe address to the caller script
+        return deployedSafe;
     }
 
     // Helper function to execute a Safe transaction
@@ -382,14 +385,12 @@ contract HatsDeployment is Script {
         uint256 _value,
         bytes memory _data
     ) internal {
-        // Then Gnosis Safe checks if msg.sender == r => pass because v=1
         bytes memory signature = abi.encodePacked(
             bytes32(uint256(uint160(adminAddress1))), // r
             bytes32(0),                               // s
             bytes1(0x01)                              // v=1
         );
 
-        // Prepare the Safe call data
         bytes memory safeTxData = abi.encodeWithSignature(
             "execTransaction(address,uint256,bytes,uint8,uint256,uint256,uint256,address,address,bytes)",
             _to,
