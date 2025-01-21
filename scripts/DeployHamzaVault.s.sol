@@ -106,7 +106,7 @@ contract DeployHamzaVault is Script {
         initActions[3] = mintLootCall;
 
         // 5) Summon Baal
-        address newBaalAddr = summoner.summonBaal(initParams, initActions, 8);
+        address newBaalAddr = summoner.summonBaal(initParams, initActions, 9);
         console.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
 
         vm.stopBroadcast();
