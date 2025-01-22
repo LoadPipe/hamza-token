@@ -57,9 +57,13 @@ contract VotingTest is Test {
         lootToken = new TestToken("LOOT", "LOOT");
         govToken = new GovernanceToken(lootToken, "Hamg", "HAMG");
         address[] memory empty;
-        timelock = new TimelockController(0, empty, empty, admin);
+        timelock = new TimelockController(1, empty, empty, admin);
         governor = new HamzaGovernor(govToken, timelock);
         systemSettings = new SystemSettings(securityContext, admin, 0);
+
+        lootToken.mint(voter1, 100);
+        lootToken.mint(voter2, 100);
+        lootToken.mint(voter3, 100);
 
         //mint token 
         govToken.mint(voter1, 100);
@@ -81,10 +85,9 @@ contract VotingTest is Test {
         assertEq(systemSettings.feeBps(), 0);
         
         vm.roll(block.number +2);
-        vm.warp(block.timestamp + 3000);
 
-        //STATE HERE SHOULD BE ACTIVE, but it's PENDING
-        //assertEq(uint256(governor.state(proposal)), uint(ProposalState.Active));
+        //state here should be active 
+        assertEq(uint256(governor.state(proposal)), uint(ProposalState.Active));
     }
     
     function testVote() public {
@@ -94,11 +97,10 @@ contract VotingTest is Test {
 
         assertEq(systemSettings.feeBps(), 0);
         vm.roll(block.number +1);
-        vm.warp(block.timestamp + 300);
         
         uint256 proposal = governor.propose(targets, values, calldatas, "Test proposal");
-        vm.roll(block.number +5);
-        vm.warp(block.timestamp + 3000);
+        vm.roll(block.number +2);
+        assertEq(uint256(governor.state(proposal)), uint(ProposalState.Active));
 
         vm.startPrank(voter1);
         governor.castVote(proposal, 1);
@@ -112,13 +114,15 @@ contract VotingTest is Test {
         governor.castVote(proposal, 1);
         vm.stopPrank();
 
-        vm.roll(block.number +10000000);
-        vm.warp(block.timestamp + 10000000);
+        uint256 votes = govToken.getVotes(voter3);
+        console.log("voting power:", votes);
+
+        vm.roll(block.number +50400);
+        vm.warp(block.timestamp + 50400);
 
         console.logUint(uint256(governor.state(proposal)));
 
-        //STATE HERE SHOULD BE SUCCEEDED, but it's DEFEATED, I presume because the proposal never becomes ACTIVE
-        //assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Succeeded));
+        assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Succeeded));
 
         //governor.queue(targets, values, calldatas, keccak256("Test proposal"));
         //governor.execute(targets, values, calldatas, "Test proposal");

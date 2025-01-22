@@ -20,11 +20,11 @@ contract HamzaGovernor is
     ) Governor("FeeVoting") GovernorVotes(_token) GovernorVotesQuorumFraction(4) GovernorTimelockControl(_timelock) {}
 
     function votingDelay() public pure override returns (uint256) {
-        return 1; // 1 day
+        return 0;
     }
 
     function votingPeriod() public pure override returns (uint256) {
-        return 50400; // 1 week
+        return 50400;
     }
 
     function proposalThreshold() public pure override returns (uint256) {
