@@ -16,10 +16,14 @@ contract CommunityVault is HasSecurityContext {
     // Mapping to store token balances held in the community vault
     mapping(address => uint256) public tokenBalances;
 
+    // Governance staking contract address
+    address public governanceStakingContract;
+
     // Events
     event Deposit(address indexed token, address indexed from, uint256 amount);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event Distribute(address indexed token, address indexed to, uint256 amount);
+    event RewardDistributed(address indexed token, address indexed recipient, uint256 amount);
 
     /**
      * @dev Constructor to initialize the security context.
@@ -101,6 +105,45 @@ contract CommunityVault is HasSecurityContext {
 
             emit Distribute(token, recipients[i], amounts[i]);
         }
+    }
+
+    /**
+     * @dev Distribute rewards for governance staking
+     * @param token The token to distribute
+     * @param recipients List of recipients
+     * @param amounts List of amounts
+     * @notice will update to only use hamza token 
+     */
+    function distributeGovernanceRewards(
+        address token,
+        address[] calldata recipients,
+        uint256[] calldata amounts
+    ) external onlyRole(Roles.ADMIN_ROLE) {
+        require(recipients.length == amounts.length, "Mismatched arrays");
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            require(tokenBalances[token] >= amounts[i], "Insufficient balance");
+
+            if (token == address(0)) {
+                revert("ETH distribution not allowed");
+            } else {
+                // ERC20 distribution
+                IERC20(token).safeTransfer(recipients[i], amounts[i]);
+            }
+
+            tokenBalances[token] -= amounts[i];
+
+            emit RewardDistributed(token, recipients[i], amounts[i]);
+        }
+    }
+
+    /**
+     * @dev Set the governance staking contract
+     * @param stakingContract The address of the staking contract
+     */
+    function setGovernanceStakingContract(address stakingContract) external onlyRole(Roles.ADMIN_ROLE) {
+        require(stakingContract != address(0), "Invalid staking contract address");
+        governanceStakingContract = stakingContract;
     }
 
     /**
