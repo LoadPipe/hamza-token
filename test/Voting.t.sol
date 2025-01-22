@@ -17,7 +17,7 @@ contract VotingTest is Test {
     TestToken lootToken;
     SystemSettings systemSettings;
     TimelockController timelock;
-
+    
     address admin;
     address voter1;
     address voter2;
@@ -77,9 +77,11 @@ contract VotingTest is Test {
 
         assertEq(systemSettings.feeBps(), 0);
         vm.roll(block.number +1);
+        vm.warp(block.timestamp + 300);
         
         uint256 proposal = governor.propose(targets, values, calldatas, "Test proposal");
         vm.roll(block.number +5);
+        vm.warp(block.timestamp + 3000);
         assertEq(proposal, 0);
 
         vm.startPrank(voter1);

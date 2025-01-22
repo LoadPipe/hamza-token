@@ -8,82 +8,82 @@ import "../src/tokens/GovernanceToken.sol";
 import "../src/utils/TestToken.sol";
 
 contract GovernanceVaultTest is Test {
-    SecurityContext _securityContext;
-    GovernanceVault _vault;
-    GovernanceToken _govToken;
-    TestToken _lootToken;
+    SecurityContext securityContext;
+    GovernanceVault vault;
+    GovernanceToken govToken;
+    TestToken lootToken;
 
-    address _admin;
-    address _account1;
-    address _account2;
-    address _account3;
+    address admin;
+    address account1;
+    address account2;
+    address account3;
 
     //bytes32 constant BURNER_ROLE = 0x0;
     //bytes32 constant MINTER_ROLE = 0x1;
 
     function setUp() public {
-        _admin = address(0x12);
-        _account1 = address(0x13);
-        _account2 = address(0x14);
-        _account3 = address(0x15);
+        admin = address(0x12);
+        account1 = address(0x13);
+        account2 = address(0x14);
+        account3 = address(0x15);
 
-        vm.deal(_admin, 1 ether);
-        vm.deal(_account1, 1 ether);
-        vm.deal(_account2, 1 ether);
-        vm.deal(_account3, 1 ether);
+        vm.deal(admin, 1 ether);
+        vm.deal(account1, 1 ether);
+        vm.deal(account2, 1 ether);
+        vm.deal(account3, 1 ether);
 
-        vm.startPrank(_admin);
-        _securityContext = new SecurityContext(_admin);
-        _lootToken = new TestToken("LOOT", "LOOT");
-        _govToken = new GovernanceToken("GOV", "GOV");
-        _vault = new GovernanceVault(_lootToken, _govToken, 0);
+        vm.startPrank(admin);
+        securityContext = new SecurityContext(admin);
+        lootToken = new TestToken("LOOT", "LOOT");
+        govToken = new GovernanceToken(lootToken, "GOV", "GOV");
+        vault = new GovernanceVault(lootToken, govToken, 0);
 
         //securityContext.grantRole(BURNER_ROLE,  _vault);
         //securityContext.grantRole(MINTER_ROLE, _vault);
 
-        _lootToken.mint(_account1, 10000000000);
-        _lootToken.mint(_account2, 10000000000);
-        _lootToken.mint(_account3, 10000000000);
+        lootToken.mint(account1, 10000000000);
+        lootToken.mint(account2, 10000000000);
+        lootToken.mint(account3, 10000000000);
         vm.stopPrank();
     }
 
     function testHappyDeposit() public {
         uint256 amount = 100;
 
-        uint256 initialLootBalance = _lootToken.balanceOf(_account1);
-        assertEq(_lootToken.balanceOf(address(_vault)), 0);
+        uint256 initialLootBalance = lootToken.balanceOf(account1);
+        assertEq(lootToken.balanceOf(address(vault)), 0);
 
         //deposit/stake
-        vm.startPrank(_account1);
-        _lootToken.approve(address(_vault), amount);
-        _vault.stake(amount);
+        vm.startPrank(account1);
+        lootToken.approve(address(vault), amount);
+        vault.stake(amount);
         vm.stopPrank();
 
-        assertEq(_govToken.balanceOf(_account1), amount);
-        assertEq(_lootToken.balanceOf(_account1), initialLootBalance - amount);
-        assertEq(_lootToken.balanceOf(address(_vault)), amount);
+        assertEq(govToken.balanceOf(account1), amount);
+        assertEq(lootToken.balanceOf(account1), initialLootBalance - amount);
+        assertEq(lootToken.balanceOf(address(vault)), amount);
     }
 
     function testHappyDepositAndBurn() public {
         uint256 amount = 100;
 
-        uint256 initialLootBalance = _lootToken.balanceOf(_account1);
-        assertEq(_lootToken.balanceOf(address(_vault)), 0);
+        uint256 initialLootBalance = lootToken.balanceOf(account1);
+        assertEq(lootToken.balanceOf(address(vault)), 0);
 
         //deposit/stake
-        vm.startPrank(_account1);
-        _lootToken.approve(address(_vault), amount);
-        _vault.stake(amount);
+        vm.startPrank(account1);
+        lootToken.approve(address(vault), amount);
+        vault.stake(amount);
 
         //burn the same amount 
-        assertEq(_govToken.balanceOf(_account1), amount);
-        vm.startPrank(_account1);
-        _vault.burn(amount);
+        assertEq(govToken.balanceOf(account1), amount);
+        vm.startPrank(account1);
+        vault.burn(amount);
         vm.stopPrank();
 
-        assertEq(_govToken.balanceOf(_account1), 0);
-        assertEq(_lootToken.balanceOf(_account1), initialLootBalance);
-        assertEq(_lootToken.balanceOf(address(_vault)), 0);
+        assertEq(govToken.balanceOf(account1), 0);
+        assertEq(lootToken.balanceOf(account1), initialLootBalance);
+        assertEq(lootToken.balanceOf(address(vault)), 0);
     }
 
     function testMultiDeposit() public {
@@ -91,19 +91,19 @@ contract GovernanceVaultTest is Test {
         uint256 amount2 = 100;
         uint256 sum = amount1 + amount2;
 
-        uint256 initialLootBalance = _lootToken.balanceOf(_account1);
-        assertEq(_lootToken.balanceOf(address(_vault)), 0);
+        uint256 initialLootBalance = lootToken.balanceOf(account1);
+        assertEq(lootToken.balanceOf(address(vault)), 0);
 
         //deposit/stake
-        vm.startPrank(_account1);
-        _lootToken.approve(address(_vault), sum);
-        _vault.stake(amount1);
-        _vault.stake(amount2);
+        vm.startPrank(account1);
+        lootToken.approve(address(vault), sum);
+        vault.stake(amount1);
+        vault.stake(amount2);
         vm.stopPrank();
 
-        assertEq(_govToken.balanceOf(_account1), sum);
-        assertEq(_lootToken.balanceOf(_account1), initialLootBalance - sum);
-        assertEq(_lootToken.balanceOf(address(_vault)), sum);
+        assertEq(govToken.balanceOf(account1), sum);
+        assertEq(lootToken.balanceOf(account1), initialLootBalance - sum);
+        assertEq(lootToken.balanceOf(address(vault)), sum);
     }
 
     function testMultiDepositAndBurnExact() public {
@@ -111,24 +111,24 @@ contract GovernanceVaultTest is Test {
         uint256 amount2 = 100;
         uint256 sum = amount1 + amount2;
 
-        uint256 initialLootBalance = _lootToken.balanceOf(_account1);
-        assertEq(_lootToken.balanceOf(address(_vault)), 0);
+        uint256 initialLootBalance = lootToken.balanceOf(account1);
+        assertEq(lootToken.balanceOf(address(vault)), 0);
 
         //deposit/stake
-        vm.startPrank(_account1);
-        _lootToken.approve(address(_vault), sum);
-        _vault.stake(amount1);
-        _vault.stake(amount2);
+        vm.startPrank(account1);
+        lootToken.approve(address(vault), sum);
+        vault.stake(amount1);
+        vault.stake(amount2);
 
         //burn the same amount 
-        assertEq(_govToken.balanceOf(_account1), sum);
-        vm.startPrank(_account1);
-        _vault.burn(sum);
+        assertEq(govToken.balanceOf(account1), sum);
+        vm.startPrank(account1);
+        vault.burn(sum);
         vm.stopPrank();
 
-        assertEq(_govToken.balanceOf(_account1), 0);
-        assertEq(_lootToken.balanceOf(_account1), initialLootBalance);
-        assertEq(_lootToken.balanceOf(address(_vault)), 0);
+        assertEq(govToken.balanceOf(account1), 0);
+        assertEq(lootToken.balanceOf(account1), initialLootBalance);
+        assertEq(lootToken.balanceOf(address(vault)), 0);
     }
 
     function testMultiDepositAndBurnUneven() public {
@@ -136,24 +136,24 @@ contract GovernanceVaultTest is Test {
         uint256 amount2 = 100;
         uint256 sum = amount1 + amount2;
 
-        uint256 initialLootBalance = _lootToken.balanceOf(_account1);
-        assertEq(_lootToken.balanceOf(address(_vault)), 0);
+        uint256 initialLootBalance = lootToken.balanceOf(account1);
+        assertEq(lootToken.balanceOf(address(vault)), 0);
 
         //deposit/stake
-        vm.startPrank(_account1);
-        _lootToken.approve(address(_vault), sum);
-        _vault.stake(amount1);
-        _vault.stake(amount2);
+        vm.startPrank(account1);
+        lootToken.approve(address(vault), sum);
+        vault.stake(amount1);
+        vault.stake(amount2);
 
         //burn the same amount 
-        assertEq(_govToken.balanceOf(_account1), sum);
-        vm.startPrank(_account1);
-        _vault.burn(sum-1);
+        assertEq(govToken.balanceOf(account1), sum);
+        vm.startPrank(account1);
+        vault.burn(sum-1);
         vm.stopPrank();
 
-        assertEq(_govToken.balanceOf(_account1), 1);
-        assertEq(_lootToken.balanceOf(_account1), initialLootBalance - 1);
-        assertEq(_lootToken.balanceOf(address(_vault)), 1);
+        assertEq(govToken.balanceOf(account1), 1);
+        assertEq(lootToken.balanceOf(account1), initialLootBalance - 1);
+        assertEq(lootToken.balanceOf(address(vault)), 1);
     }
 }
 
