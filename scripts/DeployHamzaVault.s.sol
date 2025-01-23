@@ -10,6 +10,7 @@ import "../src/CommunityVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/GovernanceVault.sol";
 
+
 /**
  * @title DeployHamzaVault
  * @notice Runs the HatsDeployment script first, then uses the
@@ -25,13 +26,33 @@ contract DeployHamzaVault is Script {
 
     uint256 internal deployerPk;
 
-    function run() external {
+    function run() external 
+    returns (
+        address hamzaBaal,
+        address communityVault,
+        address governanceToken,
+        address governanceVault,
+        address safeAddress,
+        address hatsSecurityContext
+      ) 
+    {
 
         // 1) Deploy all hats + new Gnosis Safe
         HatsDeployment hatsDeployment = new HatsDeployment();
-        (address safeAddr, address hatsSecurityContextAddr) = hatsDeployment.run();
+        (
+            address safeAddr,
+            address hats,
+            address eligibilityModule,
+            address toggleModule,
+            address hatsSecurityContextAddr,
+            uint256 adminHatId,
+            uint256 arbiterHatId,
+            uint256 daoHatId,
+            uint256 systemHatId,
+            uint256 pauserHatId
+        ) = hatsDeployment.run();
 
-        console.log("Using Safe from HatsDeployment at:", safeAddr);
+        console2.log("Using Safe from HatsDeployment at:", safeAddr);
 
         deployerPk = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPk);
@@ -40,11 +61,11 @@ contract DeployHamzaVault is Script {
         // 2) Deploy the Community Vault
         CommunityVault vault = new CommunityVault(hatsSecurityContextAddr);
 
-        console.log("CommunityVault deployed at:", address(vault));
+        console2.log("CommunityVault deployed at:", address(vault));
 
         // 3) Summon the Baal DAO
         BaalSummoner summoner = BaalSummoner(BAAL_SUMMONER);
-        console.log("BaalSummoner at:", address(summoner));
+        console2.log("BaalSummoner at:", address(summoner));
 
         // Prepare initialization params for Baal
         string memory name       = "Hamza Shares";   
@@ -109,12 +130,12 @@ contract DeployHamzaVault is Script {
 
         // 5) Summon Baal
         address newBaalAddr = summoner.summonBaal(initParams, initActions, 9);
-        console.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
+        console2.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
 
         // fetch loot token address 
         address lootTokenAddr = address(Baal(newBaalAddr).lootToken());
 
-        console.log("Loot token address:", lootTokenAddr);
+        console2.log("Loot token address:", lootTokenAddr);
 
         // deploy governance token
         GovernanceToken govToken = new GovernanceToken(
@@ -123,7 +144,7 @@ contract DeployHamzaVault is Script {
             "HAM"
         );
 
-        console.log("GovernanceToken deployed at:", address(govToken));
+        console2.log("GovernanceToken deployed at:", address(govToken));
 
         // deploy governance vault
         GovernanceVault govVault = new GovernanceVault(
@@ -136,9 +157,18 @@ contract DeployHamzaVault is Script {
 
         CommunityVault(vault).setGovernanceVault(address(govVault));
 
-        console.log("GovernanceVault deployed at:", address(govVault));
+        console2.log("GovernanceVault deployed at:", address(govVault));
 
         vm.stopBroadcast();
+
+        return (
+            newBaalAddr,        // hamzaBaal
+            address(vault),     // communityVault
+            address(govToken),  // governanceToken
+            address(govVault),  // governanceVault
+            safeAddr,           // safeAddress
+            hatsSecurityContextAddr // hatsSecurityContext
+        );
     }
 
     // Helper Functions
