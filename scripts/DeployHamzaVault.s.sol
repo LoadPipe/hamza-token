@@ -7,6 +7,8 @@ import "@baal/Baal.sol";
 import "@baal/BaalSummoner.sol";
 
 import "../src/CommunityVault.sol";
+import "../src/tokens/GovernanceToken.sol";
+import "../src/GovernanceVault.sol";
 
 /**
  * @title DeployHamzaVault
@@ -108,6 +110,31 @@ contract DeployHamzaVault is Script {
         // 5) Summon Baal
         address newBaalAddr = summoner.summonBaal(initParams, initActions, 9);
         console.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
+
+        // fetch loot token address 
+        address lootTokenAddr = address(Baal(newBaalAddr).lootToken());
+
+        console.log("Loot token address:", lootTokenAddr);
+
+        // deploy governance token
+        GovernanceToken govToken = new GovernanceToken(
+            IERC20(lootTokenAddr),
+            "HamGov",
+            "HAM"
+        );
+
+        console.log("GovernanceToken deployed at:", address(govToken));
+
+        // deploy governance vault
+        GovernanceVault govVault = new GovernanceVault(
+            lootTokenAddr,
+            GovernanceToken(address(govToken)),
+            30
+        );
+
+        govToken.setGovernanceVault(address(govVault));
+
+        console.log("GovernanceVault deployed at:", address(govVault));
 
         vm.stopBroadcast();
     }

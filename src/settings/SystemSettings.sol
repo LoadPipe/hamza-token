@@ -3,6 +3,8 @@ pragma solidity ^0.8.17;
 
 import "../security/HasSecurityContext.sol"; 
 import "./ISystemSettings.sol"; 
+import "../security/IHatsSecurityContext.sol";
+import "../security/Roles.sol";
 
 /**
  * @title SystemSettings
@@ -57,7 +59,7 @@ contract SystemSettings is HasSecurityContext, ISystemSettings
      * @param vaultAddress_ Recipient of the extracted fees. 
      * @param feeBps_ Amount of fees charged in basis points. 
      */
-    constructor(ISecurityContext securityContext, address vaultAddress_, uint256 feeBps_) {
+    constructor(IHatsSecurityContext securityContext, address vaultAddress_, uint256 feeBps_) {
         _setSecurityContext(securityContext);
         if (vaultAddress_ == address(0)) 
             revert("InvalidVaultAddress");
@@ -77,7 +79,7 @@ contract SystemSettings is HasSecurityContext, ISystemSettings
      * 
      * @param vaultAddress_ The new address. 
      */
-    function setVaultAddress(address vaultAddress_) public onlyRole(DAO_ROLE) {
+    function setVaultAddress(address vaultAddress_) public onlyRole(Roles.DAO_ROLE) {
         if (_vaultAddress != vaultAddress_) {
             if (vaultAddress_ == address(0)) 
                 revert ("InvalidValue");
@@ -98,7 +100,7 @@ contract SystemSettings is HasSecurityContext, ISystemSettings
      * 
      * @param feeBps_ The new value for fee in BPS. 
      */
-    function setFeeBps(uint256 feeBps_) public onlyRole(DAO_ROLE) {
+    function setFeeBps(uint256 feeBps_) public onlyRole(Roles.DAO_ROLE) {
         if (_feeBps != feeBps_) {
             _feeBps = feeBps_;
             emit FeeBpsChanged(_feeBps, msg.sender);(_vaultAddress, msg.sender);

@@ -19,8 +19,8 @@ contract GovernanceVault is HasSecurityContext {
         uint256 timestamp;
     }
 
-    constructor(IERC20 looTokenAddress, GovernanceToken governanceTokenAddress, uint256 vestingPeriod) {
-        lootToken = looTokenAddress;
+    constructor(address looTokenAddress, GovernanceToken governanceTokenAddress, uint256 vestingPeriod) {
+        lootToken = IERC20(looTokenAddress);
         governanceToken = governanceTokenAddress; 
         vestingPeriodSeconds = vestingPeriod;
     }
@@ -36,6 +36,19 @@ contract GovernanceVault is HasSecurityContext {
         //emit governance token 
         governanceToken.mint(msg.sender, amount);
     }
+
+    //TODO: reentrancy-guard
+    function stakeFor(address staker, uint256 amount) external {
+        //soak up the loot token 
+        IERC20(lootToken).safeTransferFrom(msg.sender, address(this), amount);
+
+        //record the deposit 
+        deposits[staker].push(Deposit(amount, block.timestamp));
+
+        //emit governance token 
+        governanceToken.mint(staker, amount);
+    } 
+
 
     function burn(uint256 amount) external {
         uint256 requestedAmount = amount;
