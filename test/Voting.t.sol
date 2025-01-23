@@ -65,12 +65,22 @@ contract VotingTest is Test {
         lootToken.mint(voter2, 100);
         lootToken.mint(voter3, 100);
 
-        //mint token 
-        govToken.mint(voter1, 100);
-        govToken.mint(voter2, 100);
-        govToken.mint(voter3, 100);
-
+        vm.startPrank(voter1);
+        lootToken.approve(address(govToken), 100);
+        govToken.depositFor(voter1, 100);
         vm.stopPrank();
+
+        vm.startPrank(voter2);
+        lootToken.approve(address(govToken), 100);
+        govToken.depositFor(voter2, 100);
+        vm.stopPrank();
+
+        vm.startPrank(voter3);
+        lootToken.approve(address(govToken), 100);
+        govToken.depositFor(voter3, 100);
+        vm.stopPrank();
+
+        console.log("token balance", govToken.balanceOf(voter1));
     }
     
     function testProposeVote() public {
@@ -114,11 +124,11 @@ contract VotingTest is Test {
         governor.castVote(proposal, 1);
         vm.stopPrank();
 
+        vm.roll(block.number +50401);
+        vm.warp(block.timestamp + 50401);
+
         uint256 votes = govToken.getVotes(voter3);
         console.log("voting power:", votes);
-
-        vm.roll(block.number +50400);
-        vm.warp(block.timestamp + 50400);
 
         console.logUint(uint256(governor.state(proposal)));
 
