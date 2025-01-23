@@ -4,3 +4,4 @@
 @gnosis.pm/safe-contracts/=lib/safe-contracts/
 @gnosis.pm/zodiac/=lib/zodiac/
 @opengsn/=lib/gsn/packages/
+@hats-protocol/=lib/hats-protocol/src

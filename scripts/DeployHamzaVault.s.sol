@@ -1,83 +1,71 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-import "forge-std/Script.sol";
-import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
+import "./HatsDeployment.s.sol";
 
 import "@baal/Baal.sol";
 import "@baal/BaalSummoner.sol";
 
 import "../src/CommunityVault.sol";
 
+/**
+ * @title DeployHamzaVault
+ * @notice Runs the HatsDeployment script first, then uses the
+ *         returned Safe address to deploy and configure the Baal DAO.
+ */
 contract DeployHamzaVault is Script {
     // (A) Deployed BaalSummoner on Sepolia
-    address constant BAAL_SUMMONER = 0x33267E2d3decebCae26FA8D837Ef3F7608367ab2; //new summoner with custom baal
+    address constant BAAL_SUMMONER = 0x33267E2d3decebCae26FA8D837Ef3F7608367ab2; 
 
-    // (B) Gnosis Safe singleton & factory on Sepolia
-    address constant SAFE_SINGLETON = 0x69f4D1788e39c87893C980c06EdF4b7f686e2938;
-    address constant SAFE_FACTORY  = 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC;
-
-    // (C) Two owners
+    // addresses for loot recipients, etc.
     address constant OWNER_ONE = 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8;
     address constant OWNER_TWO = 0x1542612fee591eD35C05A3E980bAB325265c06a3;
 
-    // Deploy & configure the DAO
-    function run() public {
-        vm.startBroadcast();
+    uint256 internal deployerPk;
 
-        // STEP 1: Deploy a 2-of-2 Gnosis Safe
-        GnosisSafeProxyFactory factory = GnosisSafeProxyFactory(SAFE_FACTORY);
+    function run() external {
 
-        //deploy communtiy vault
-        CommunityVault vault = new CommunityVault();
+        // 1) Deploy all hats + new Gnosis Safe
+        HatsDeployment hatsDeployment = new HatsDeployment();
+        (address safeAddr, address hatsSecurityContextAddr) = hatsDeployment.run();
 
-        address[] memory owners = new address[](2);
-        owners[0] = OWNER_ONE;
-        owners[1] = OWNER_TWO;
+        console.log("Using Safe from HatsDeployment at:", safeAddr);
 
-        bytes memory setupData = abi.encodeWithSignature(
-            "setup(address[],uint256,address,bytes,address,address,uint256,address)",
-            owners,      // Owners array
-            1,           // Threshold (1-of-2)
-            address(0),  // No `to` delegate call
-            "",          // No `data`
-            address(0),  // No fallback handler
-            address(0),  // No payment token
-            0,           // Payment = 0
-            address(0),   // No payment receiver
-            address(vault) //community vault
-        );
+        deployerPk = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPk);
 
-        address safeAddr = address(factory.createProxy(
-            SAFE_SINGLETON,
-            setupData
-        ));
 
-        console.log("Gnosis Safe deployed at:", safeAddr);
+        // 2) Deploy the Community Vault
+        CommunityVault vault = new CommunityVault(hatsSecurityContextAddr);
 
-        // STEP 2: Instantiate the BaalSummoner
+        console.log("CommunityVault deployed at:", address(vault));
+
+        // 3) Summon the Baal DAO
         BaalSummoner summoner = BaalSummoner(BAAL_SUMMONER);
         console.log("BaalSummoner at:", address(summoner));
 
-        // STEP 3: Prepare initialization params for BaalSummoner
+        // Prepare initialization params for Baal
         string memory name       = "Hamza Shares";   
         string memory symbol     = "HS";
         address _forwarder       = address(0);
         address _lootToken       = address(0);
         address _sharesToken     = address(0);
+        address _communityVault  = address(vault);
 
+        // These params are for the custom Baal
         bytes memory initParams = abi.encode(
             name,
             symbol,
             address(0), //setups safe 
             _forwarder,
             _lootToken,
-            _sharesToken
+            _sharesToken,
+            _communityVault
         );
 
-        // STEP 4: Create initialization actions
+        // 4) define the initActions for Baal
 
-        // (A) Mint 1 share to the new Safe
+        // (A) Mint 1 share to the Safe (admin multisig)
         bytes memory mintSharesCall = abi.encodeWithSelector(
             Baal.mintShares.selector,
             _singleAddressArray(safeAddr),
@@ -91,15 +79,13 @@ contract DeployHamzaVault is Script {
             false   // pauseLoot   = false
         );
 
-        // (C) Lock the manager role so no more shares can be minted
-        //     This calls: lockManager managerLock = true
-        //     After that no one can be assigned manager permissions
+        // (C) Lock the manager role
         bytes memory lockManagerCall = abi.encodeWithSelector(
             Baal.lockManager.selector
         );
 
-        // (D) Mint 100 loot tokens to the owner and the vault
-        address[] memory recipients =  new address[](2);
+        // (D) Mint 100 loot tokens (50 to OWNER_ONE, 50 to the vault)
+        address[] memory recipients = new address[](2);
         recipients[0] = OWNER_ONE;
         recipients[1] = address(vault);
 
@@ -113,15 +99,14 @@ contract DeployHamzaVault is Script {
             lootAmounts
         );
 
-        // Combine all three calls into initActions
         bytes[] memory initActions = new bytes[](4);
         initActions[0] = mintSharesCall;
         initActions[1] = unpauseLootCall;
         initActions[2] = lockManagerCall;
         initActions[3] = mintLootCall;
 
-        // STEP 5: Summon a new Baal DAO
-        address newBaalAddr = summoner.summonBaal(initParams, initActions, 5);
+        // 5) Summon Baal
+        address newBaalAddr = summoner.summonBaal(initParams, initActions, 9);
         console.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
 
         vm.stopBroadcast();
