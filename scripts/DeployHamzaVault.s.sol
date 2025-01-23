@@ -26,6 +26,8 @@ contract DeployHamzaVault is Script {
 
     uint256 internal deployerPk;
 
+     uint256 public adminHatId;
+
     function run() external 
     returns (
         address hamzaBaal,
@@ -45,12 +47,15 @@ contract DeployHamzaVault is Script {
             address eligibilityModule,
             address toggleModule,
             address hatsSecurityContextAddr,
-            uint256 adminHatId,
+            uint256 _adminHatId,
             uint256 arbiterHatId,
             uint256 daoHatId,
             uint256 systemHatId,
             uint256 pauserHatId
         ) = hatsDeployment.run();
+
+        adminHatId = _adminHatId;
+    
 
         console2.log("Using Safe from HatsDeployment at:", safeAddr);
 
