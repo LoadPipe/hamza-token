@@ -83,9 +83,9 @@ contract HamzaGovernor is
     function _getVotes(
         address account,
         uint256 blockNumber,
-        bytes memory params
+        bytes memory /*params*/
     ) internal view override(Governor, GovernorVotes) returns (uint256) {
-        return 100;
+        return token.getPastVotes(account, blockNumber);
     }
 
     function supportsInterface(

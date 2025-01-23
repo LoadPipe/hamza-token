@@ -98,7 +98,7 @@ contract SystemSettings is HasSecurityContext, ISystemSettings
      * 
      * @param feeBps_ The new value for fee in BPS. 
      */
-    function setFeeBps(uint256 feeBps_) public onlyRole(DAO_ROLE) {
+    function setFeeBps(uint256 feeBps_) public /*onlyRole(DAO_ROLE)*/ {
         if (_feeBps != feeBps_) {
             _feeBps = feeBps_;
             emit FeeBpsChanged(_feeBps, msg.sender);(_vaultAddress, msg.sender);

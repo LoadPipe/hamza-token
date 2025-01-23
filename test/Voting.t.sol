@@ -61,6 +61,13 @@ contract VotingTest is Test {
         governor = new HamzaGovernor(govToken, timelock);
         systemSettings = new SystemSettings(securityContext, admin, 0);
 
+        console.log("admin address is", admin);
+        console.log("gov address is", address(governor));
+
+        timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
+        timelock.grantRole(0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1, address(governor));
+        
+
         lootToken.mint(voter1, 100);
         lootToken.mint(voter2, 100);
         lootToken.mint(voter3, 100);
@@ -129,14 +136,54 @@ contract VotingTest is Test {
 
         uint256 votes = govToken.getVotes(voter3);
         console.log("voting power:", votes);
-
-        console.logUint(uint256(governor.state(proposal)));
+        console.log("num checkpoints:", govToken.numCheckpoints(voter1));
 
         assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Succeeded));
 
         //governor.queue(targets, values, calldatas, keccak256("Test proposal"));
         //governor.execute(targets, values, calldatas, "Test proposal");
         //assertEq(systemSettings.feeBps(), 1);
+    }
+    
+    function testVoteExecute() public {
+        targets.push(address(systemSettings));
+        values.push(uint256(0));
+        calldatas.push(abi.encodeWithSignature("setFeeBps(uint256)", 1));
+
+        assertEq(systemSettings.feeBps(), 0);
+        vm.roll(block.number +1);
+        
+        uint256 proposal = governor.propose(targets, values, calldatas, "Test proposal");
+        vm.roll(block.number +2);
+        assertEq(uint256(governor.state(proposal)), uint(ProposalState.Active));
+
+        vm.startPrank(voter1);
+        governor.castVote(proposal, 1);
+        vm.stopPrank();
+
+        vm.startPrank(voter2);
+        governor.castVote(proposal, 1);
+        vm.stopPrank();
+
+        vm.startPrank(voter3);
+        governor.castVote(proposal, 1);
+        vm.stopPrank();
+
+        vm.roll(block.number +50401);
+        vm.warp(block.timestamp + 50401);
+
+        assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Succeeded));
+
+        bytes32 descriptionHash = keccak256(bytes("Test proposal"));
+
+        assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Succeeded));
+        vm.roll(block.number +1);
+        vm.warp(block.timestamp + 999999);
+
+        governor.execute(targets, values, calldatas, descriptionHash);
+        assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Executed));
+
+        assertEq(systemSettings.feeBps(), 1);
     }
 }
 

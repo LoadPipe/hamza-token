@@ -17,11 +17,11 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper {
     }
 
     function mint(address to, uint256 amount) external /* onlyRole(MINTER_ROLE) */ {
-        super._mint(to, amount);
+        _mint(to, amount);
     }
 
     function burn(address account, uint256 amount) external /* onlyRole(BURNER_ROLE) */ {
-        super._burn(account, amount);
+        _burn(account, amount);
     }
 
     function _mint(address to, uint256 amount) internal override(ERC20, ERC20Votes) {
@@ -30,6 +30,14 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper {
 
     function _burn(address account, uint256 amount) internal override(ERC20, ERC20Votes) {
         super._burn(account, amount);
+    }
+
+    function getVotes(address account) public override(ERC20Votes) view returns (uint256) {
+        return balanceOf(account);
+    }
+
+    function getPastVotes(address account, uint256 blockNumber) public override(ERC20Votes) view returns (uint256) {
+        return balanceOf(account);
     }
 
     function transferFromNoAllowance(address from, address to, uint256 amount) external /* onlyRole(MINTER_ROLE) */ {
