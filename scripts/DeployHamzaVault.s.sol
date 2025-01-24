@@ -158,9 +158,7 @@ contract DeployHamzaVault is Script {
             30
         );
 
-        govToken.setGovernanceVault(address(govVault));
-
-        CommunityVault(vault).setGovernanceVault(address(govVault));
+        CommunityVault(vault).setGovernanceVault(address(govVault), lootTokenAddr);
 
         console2.log("GovernanceVault deployed at:", address(govVault));
 

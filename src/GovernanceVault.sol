@@ -18,21 +18,19 @@ contract GovernanceVault is HasSecurityContext {
 
     struct Deposit {
         uint256 amount;
-        uint256 timestamp;
+        uint256 stakedAt;
         uint256 lastClaimAt;
     }
 
-    constructor(IERC20 looTokenAddress, GovernanceToken governanceTokenAddress, uint256 vestingPeriod) {
-        lootToken = looTokenAddress;
+    constructor(address looTokenAddress, GovernanceToken governanceTokenAddress, uint256 vestingPeriod) {
+        lootToken = IERC20(looTokenAddress);
         governanceToken = governanceTokenAddress; 
         vestingPeriodSeconds = vestingPeriod;
-
-        governanceToken.setGovernanceVault(address(this));
     }
 
     function deposit(uint256 amount) external {
-        deposits[_msgSender()].push(Deposit(amount, block.timestamp, block.timestamp));
-        governanceToken.depositFor(_msgSender(), amount);
+        deposits[msg.sender].push(Deposit(amount, block.timestamp, block.timestamp));
+        governanceToken.depositFor(msg.sender, amount);
     }
 
     function withdraw(uint256 amount) external {
@@ -41,7 +39,7 @@ contract GovernanceVault is HasSecurityContext {
         uint256 count = 0;
 
         while(amount > 0 && deps.length > 0) {
-            if (deps[0].timestamp <= (block.timestamp - vestingPeriodSeconds)) {
+            if (deps[0].stakedAt <= (block.timestamp - vestingPeriodSeconds)) {
                 Deposit storage deposit = deps[0];
 
                 //this deposit is mature, and has enough or more than enough 

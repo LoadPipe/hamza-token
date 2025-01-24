@@ -129,7 +129,6 @@ contract CommunityVault is HasSecurityContext {
     */
     function setGovernanceVault(address vault, address lootToken)
         external
-        onlyRole(Roles.ADMIN_ROLE)
     {
         require(vault != address(0), "Invalid staking contract address");
         require(lootToken != address(0), "Invalid loot token address");
