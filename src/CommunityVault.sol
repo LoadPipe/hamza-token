@@ -122,13 +122,24 @@ contract CommunityVault is HasSecurityContext {
     }
 
     /**
-     * @dev Set the governance vault address
-     * @param vault The address of the governance vault
-     */
-     // TODO: admin only
-    function setGovernanceVault(address vault) external {
+    * @dev Set the governance vault address and grant it unlimited allowance for `lootToken`.
+    *      Must be called by an admin role or similar.
+    * @param vault The address of the governance vault
+    * @param lootToken The address of the ERC20 token for which you'd like to grant unlimited allowance
+    */
+    function setGovernanceVault(address vault, address lootToken)
+        external
+        onlyRole(Roles.ADMIN_ROLE)
+    {
         require(vault != address(0), "Invalid staking contract address");
+        require(lootToken != address(0), "Invalid loot token address");
+
         governanceVault = vault;
+
+        // Best practice when changing allowances:
+
+        IERC20(lootToken).safeApprove(vault, 0);
+        IERC20(lootToken).safeApprove(vault, type(uint256).max);
     }
 
     /**

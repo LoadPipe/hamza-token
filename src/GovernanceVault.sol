@@ -11,22 +11,27 @@ contract GovernanceVault is HasSecurityContext {
     
     IERC20 lootToken;
     GovernanceToken governanceToken;
+    address public communityVault;
+
     uint256 vestingPeriodSeconds = 30;
     mapping(address => Deposit[]) deposits;
 
     struct Deposit {
         uint256 amount;
         uint256 timestamp;
+        uint256 lastClaimAt;
     }
 
     constructor(IERC20 looTokenAddress, GovernanceToken governanceTokenAddress, uint256 vestingPeriod) {
         lootToken = looTokenAddress;
         governanceToken = governanceTokenAddress; 
         vestingPeriodSeconds = vestingPeriod;
+
+        governanceToken.setGovernanceVault(address(this));
     }
 
     function deposit(uint256 amount) external {
-        deposits[_msgSender()].push(Deposit(amount, block.timestamp));
+        deposits[_msgSender()].push(Deposit(amount, block.timestamp, block.timestamp));
         governanceToken.depositFor(_msgSender(), amount);
     }
 
@@ -72,5 +77,78 @@ contract GovernanceVault is HasSecurityContext {
 
         //otherwise, burn & return 
         governanceToken.withdrawTo(msg.sender, requestedAmount);
+    }
+
+    /// @notice Sum of all new (unclaimed) rewards for this staker
+    function rewards(address staker) public view returns (uint256) {
+        uint256 totalReward;
+        Deposit[] storage userDeposits = deposits[staker];
+
+        for (uint256 i = 0; i < userDeposits.length; i++) {
+            Deposit storage d = userDeposits[i];
+
+            uint256 claimStart = d.lastClaimAt;
+            uint256 maxClaimEnd = d.stakedAt + vestingPeriodSeconds;
+
+            // If we’ve already claimed everything from that deposit, skip
+            if (claimStart >= maxClaimEnd) {
+                continue;
+            }
+
+            // The portion we can claim is from [claimStart..claimEnd]
+            uint256 claimEnd = block.timestamp;
+            if (claimEnd > maxClaimEnd) {
+                claimEnd = maxClaimEnd;
+            }
+
+            if (claimEnd > claimStart) {
+                uint256 newSeconds = claimEnd - claimStart;
+                // Linear vest: reward = (depositAmount * fraction_of_vesting_period)
+                uint256 newReward = (d.amount * newSeconds) / vestingPeriodSeconds;
+                totalReward += newReward;
+            }
+        }
+        return totalReward;
+    }
+
+    /// @notice Convenient batch version
+    function distributeRewardsMultiple(address[] calldata stakers) external {
+        for (uint256 i = 0; i < stakers.length; i++) {
+            distributeRewards(stakers[i]);
+        }
+    }
+
+    /**
+     * @notice Move real underlying tokens from the CommunityVault 
+     *         and stake them on behalf of `staker`. Then mark all
+     *         relevant deposit entries as claimed.
+     */
+    function distributeRewards(address staker) public {
+        uint256 totalReward = rewards(staker);
+        if (totalReward == 0) {
+            return; 
+        }
+
+        // Mark all of the user’s deposits as “claimed through now”
+        Deposit[] storage userDeposits = deposits[staker];
+        for (uint256 i = 0; i < userDeposits.length; i++) {
+            userDeposits[i].lastClaimAt = block.timestamp;
+        }
+        // Now pull tokens from the CommunityVault to this vault
+        lootToken.safeTransferFrom(communityVault, address(this), totalReward);
+
+        // Next, stake them on behalf of the staker
+        lootToken.safeIncreaseAllowance(address(governanceToken), totalReward);
+
+        // Finally, deposit them for the staker. 
+        governanceToken.depositFor(staker, totalReward);
+    }
+
+    /**
+     * @notice Set which CommunityVault we pull reward tokens from
+     */
+    function setCommunityVault(address _communityVault) external /* onlyAdminOrSomething */ {
+        require(_communityVault != address(0), "Invalid address");
+        communityVault = _communityVault;
     }
 }
