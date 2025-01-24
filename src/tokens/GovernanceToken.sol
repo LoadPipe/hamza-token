@@ -8,10 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Wrapper.sol";
 import "../security/HasSecurityContext.sol"; 
 
-contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper{
-
-    address public GOVERNANCE_VAULT;
-
+contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper {
     constructor(IERC20 wrappedToken, string memory name_, string memory symbol_) 
         ERC20("HamGov", "HAM") ERC20Permit("HamGov") ERC20Wrapper(wrappedToken) {}
 
@@ -19,41 +16,42 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper{
         return 18;
     }
 
-    modifier onlyGovVault() {
-        require(msg.sender == GOVERNANCE_VAULT, "GovernanceToken: caller is not the governance vault");
-        _;
+    function mint(address to, uint256 amount) external /* onlyRole(MINTER_ROLE) */ {
+        _mint(to, amount);
     }
 
-    function mint(address to, uint256 amount) external onlyGovVault() {
-        super._mint(to, amount);
+    function burn(address account, uint256 amount) external /* onlyRole(BURNER_ROLE) */ {
+        _burn(account, amount);
+    }
+    
+    function depositFor(address account, uint256 amount) public override(ERC20Wrapper) returns (bool) /* onlyRole(MINTER_ROLE) */ {
+        SafeERC20.safeTransferFrom(underlying, account, address(this), amount);
+        _mint(account, amount);
+        return true;
     }
 
-    function burn(address account, uint256 amount) external onlyGovVault() {
-        super._burn(account, amount);
+    function withdrawTo(address account, uint256 amount) public override(ERC20Wrapper) returns (bool) /* onlyRole(MINTER_ROLE) */ {
+        _burn(account, amount);
+        SafeERC20.safeTransfer(underlying, account, amount);
+        return true;
     }
 
     function _mint(address to, uint256 amount) internal override(ERC20, ERC20Votes) {
         super._mint(to, amount);
+        //TODO: this line is suspect
+        _delegate(to, to);
     }
 
     function _burn(address account, uint256 amount) internal override(ERC20, ERC20Votes) {
         super._burn(account, amount);
     }
 
-    function transferFromNoAllowance(address from, address to, uint256 amount) external onlyGovVault() {
-        _approve(from, address(this), amount);
-        this.transferFrom(from, to, amount);
-    }
-
     function _afterTokenTransfer(
         address from,
         address to,
         uint256 amount
-    ) internal override(ERC20, ERC20Votes) {}
+    ) internal override(ERC20, ERC20Votes) {
 
-    //TODO: make admin can change this
-    function setGovernanceVault(address vault) external {
-        require(GOVERNANCE_VAULT == address(0), "GovernanceToken: vault already set");
-        GOVERNANCE_VAULT = vault;
+        super._afterTokenTransfer(from, to, amount);
     }
 }
