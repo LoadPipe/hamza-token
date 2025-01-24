@@ -25,19 +25,12 @@ contract GovernanceVault is HasSecurityContext {
         vestingPeriodSeconds = vestingPeriod;
     }
 
-    //TODO: reentrancy-guard
-    function stake(uint256 amount) external {
-        //soak up the loot token 
-        IERC20(lootToken).safeTransferFrom(msg.sender, address(this), amount);
-
-        //record the deposit 
-        deposits[msg.sender].push(Deposit(amount, block.timestamp));
-
-        //emit governance token 
-        governanceToken.mint(msg.sender, amount);
+    function deposit(uint256 amount) external {
+        deposits[_msgSender()].push(Deposit(amount, block.timestamp));
+        governanceToken.depositFor(_msgSender(), amount);
     }
 
-    function burn(uint256 amount) external {
+    function withdraw(uint256 amount) external {
         uint256 requestedAmount = amount;
         Deposit[] storage deps = deposits[msg.sender];
         uint256 count = 0;
@@ -78,7 +71,6 @@ contract GovernanceVault is HasSecurityContext {
         }
 
         //otherwise, burn & return 
-        governanceToken.burn(msg.sender, requestedAmount);
-        lootToken.transfer(msg.sender, requestedAmount);
+        governanceToken.withdrawTo(msg.sender, requestedAmount);
     }
 }
