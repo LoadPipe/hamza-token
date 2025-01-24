@@ -109,19 +109,6 @@ contract CommunityVault is HasSecurityContext {
     }
 
     /**
-     * @dev Distribute governance rewards to multiple recipients
-     * @param recipients The array of recipient addresses
-     */
-    function distributeGovernanceRewards(
-        address[] calldata recipients
-    ) external onlyRole(Roles.ADMIN_ROLE) {
-
-        //call the distrubtRewardsMultiple function in the governance vault
-        GovernanceVault(governanceVault).distributeRewardsMultiple(recipients);
-        
-    }
-
-    /**
     * @dev Set the governance vault address and grant it unlimited allowance for `lootToken`.
     *      Must be called by an admin role or similar.
     * @param vault The address of the governance vault
@@ -136,7 +123,6 @@ contract CommunityVault is HasSecurityContext {
         governanceVault = vault;
 
         // Best practice when changing allowances:
-
         IERC20(lootToken).safeApprove(vault, 0);
         IERC20(lootToken).safeApprove(vault, type(uint256).max);
     }

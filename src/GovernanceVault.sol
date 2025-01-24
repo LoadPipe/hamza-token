@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./tokens/GovernanceToken.sol";
 import "./security/HasSecurityContext.sol"; 
+import {console} from "forge-std/console.sol";
 
 contract GovernanceVault is HasSecurityContext {
     using SafeERC20 for IERC20;
@@ -14,7 +15,7 @@ contract GovernanceVault is HasSecurityContext {
     address public communityVault;
 
     uint256 vestingPeriodSeconds = 30;
-    mapping(address => Deposit[]) deposits;
+    mapping(address => Deposit[]) public deposits;
 
     struct Deposit {
         uint256 amount;
@@ -26,6 +27,11 @@ contract GovernanceVault is HasSecurityContext {
         lootToken = IERC20(looTokenAddress);
         governanceToken = governanceTokenAddress; 
         vestingPeriodSeconds = vestingPeriod;
+    }
+
+    function depositFor(address account, uint256 amount) external {
+        deposits[account].push(Deposit(amount, block.timestamp, block.timestamp));
+        governanceToken.depositForGov(account, amount);
     }
 
     function deposit(uint256 amount) external {
@@ -40,21 +46,21 @@ contract GovernanceVault is HasSecurityContext {
 
         while(amount > 0 && deps.length > 0) {
             if (deps[0].stakedAt <= (block.timestamp - vestingPeriodSeconds)) {
-                Deposit storage deposit = deps[0];
+                Deposit storage depos = deps[0];
 
                 //this deposit is mature, and has enough or more than enough 
-                if (deposit.amount >= amount) {
-                    deposit.amount -= amount; 
+                if (depos.amount >= amount) {
+                    depos.amount -= amount; 
                     amount = 0;
 
                 //this deposit is mature, but does not have enough to cover the full amount
                 } else {
-                    amount -= deposit.amount;
-                    deposit.amount = 0;
+                    amount -= depos.amount;
+                    depos.amount = 0;
                 }
 
                 //delete deposits that are empty
-                if (deposit.amount == 0) {
+                if (depos.amount == 0) {
                     //TODO: not this
                     for(uint256 n=0; n<deps.length-1; n++) {
                         deps[n] = deps[n+1];
@@ -122,6 +128,7 @@ contract GovernanceVault is HasSecurityContext {
      *         relevant deposit entries as claimed.
      */
     function distributeRewards(address staker) public {
+        console.log("Distributing rewards for", staker);
         uint256 totalReward = rewards(staker);
         if (totalReward == 0) {
             return; 
@@ -132,14 +139,23 @@ contract GovernanceVault is HasSecurityContext {
         for (uint256 i = 0; i < userDeposits.length; i++) {
             userDeposits[i].lastClaimAt = block.timestamp;
         }
+
+        console.log("got here");
+
         // Now pull tokens from the CommunityVault to this vault
         lootToken.safeTransferFrom(communityVault, address(this), totalReward);
+
+        console.log("Distributing", totalReward, "tokens to", staker);
 
         // Next, stake them on behalf of the staker
         lootToken.safeIncreaseAllowance(address(governanceToken), totalReward);
 
+        console.log("Depositing", totalReward, "tokens for", staker);
+
         // Finally, deposit them for the staker. 
-        governanceToken.depositFor(staker, totalReward);
+        this.depositFor(staker, totalReward);
+
+        console.log("Done distributing rewards for", staker);
     }
 
     /**

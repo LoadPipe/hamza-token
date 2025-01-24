@@ -21,17 +21,19 @@ contract DeployHamzaVault is Script {
     address constant BAAL_SUMMONER = 0x33267E2d3decebCae26FA8D837Ef3F7608367ab2; 
 
     // addresses for loot recipients, etc.
-    address constant OWNER_ONE = 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8;
+    address public constant OWNER_ONE = 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8;
     address constant OWNER_TWO = 0x1542612fee591eD35C05A3E980bAB325265c06a3;
 
     uint256 internal deployerPk;
 
-     uint256 public adminHatId;
+    uint256 public adminHatId;
+
+    address public hamzaToken;
 
     function run() external 
     returns (
         address hamzaBaal,
-        address communityVault,
+        address payable communityVault,
         address governanceToken,
         address governanceVault,
         address safeAddress,
@@ -140,6 +142,8 @@ contract DeployHamzaVault is Script {
         // fetch loot token address 
         address lootTokenAddr = address(Baal(newBaalAddr).lootToken());
 
+        hamzaToken = lootTokenAddr;
+
         console2.log("Loot token address:", lootTokenAddr);
 
         // deploy governance token
@@ -160,13 +164,15 @@ contract DeployHamzaVault is Script {
 
         CommunityVault(vault).setGovernanceVault(address(govVault), lootTokenAddr);
 
+        govVault.setCommunityVault(address(vault));
+
         console2.log("GovernanceVault deployed at:", address(govVault));
 
         vm.stopBroadcast();
 
         return (
             newBaalAddr,        // hamzaBaal
-            address(vault),     // communityVault
+            payable(address(vault)),     // communityVault
             address(govToken),  // governanceToken
             address(govVault),  // governanceVault
             safeAddr,           // safeAddress
