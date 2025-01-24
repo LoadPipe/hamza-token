@@ -50,57 +50,50 @@ contract VotingTest is Test {
         vm.deal(voter2, 1 ether);
         vm.deal(voter3, 1 ether);
 
-        vm.startPrank(admin);
-        
-        // Deploy contracts
-        securityContext = new SecurityContext(admin);
+        //create tokens & mint
         lootToken = new TestToken("LOOT", "LOOT");
         govToken = new GovernanceToken(lootToken, "Hamg", "HAMG");
-        address[] memory empty;
-        timelock = new TimelockController(1, empty, empty, admin);
-        governor = new HamzaGovernor(govToken, timelock);
-        systemSettings = new SystemSettings(securityContext, admin, 0);
-
-        console.log("admin address is", admin);
-        console.log("gov address is", address(governor));
-
-        timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
-        timelock.grantRole(0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1, address(governor));
-        
 
         lootToken.mint(voter1, 100);
         lootToken.mint(voter2, 100);
         lootToken.mint(voter3, 100);
 
-        vm.startPrank(voter1);
-        lootToken.approve(address(govToken), 100);
-        govToken.depositFor(voter1, 100);
-        vm.stopPrank();
+        //wrap tokens for voters
+        address[3] memory voters = [voter1, voter2, voter3];
+        for(uint8 n=0; n<voters.length; n++) {
+            vm.startPrank(voters[n]);
+            lootToken.approve(address(govToken), 100);
+            govToken.depositFor(voters[n], 100);
+            vm.stopPrank();
+        }
 
-        vm.startPrank(voter2);
-        lootToken.approve(address(govToken), 100);
-        govToken.depositFor(voter2, 100);
-        vm.stopPrank();
+        vm.startPrank(admin);
+        
+        // deploy main contracts
+        securityContext = new SecurityContext(admin);
+        address[] memory empty;
+        timelock = new TimelockController(1, empty, empty, admin);
+        governor = new HamzaGovernor(govToken, timelock);
+        systemSettings = new SystemSettings(securityContext, admin, 0);
 
-        vm.startPrank(voter3);
-        lootToken.approve(address(govToken), 100);
-        govToken.depositFor(voter3, 100);
-        vm.stopPrank();
+        //grant permissions
+        timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
 
-        console.log("token balance", govToken.balanceOf(voter1));
-    }
-    
-    function testProposeVote() public {
+        //prepare proposal data
         targets.push(address(systemSettings));
         values.push(uint256(0));
         calldatas.push(abi.encodeWithSignature("setFeeBps(uint256)", 1));
-
+    }
+    
+    function testProposeVote() public {
+        //make a proposal
         uint256 proposal = governor.propose(targets, values, calldatas, "Test proposal");
 
+        //test proposal
         assertGt(proposal, 0);
         assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Pending));
-        assertEq(systemSettings.feeBps(), 0);
         
+        //roll fwd
         vm.roll(block.number +2);
 
         //state here should be active 
@@ -108,76 +101,57 @@ contract VotingTest is Test {
     }
     
     function testVote() public {
-        targets.push(address(systemSettings));
-        values.push(uint256(0));
-        calldatas.push(abi.encodeWithSignature("setFeeBps(uint256)", 1));
-
-        assertEq(systemSettings.feeBps(), 0);
-        vm.roll(block.number +1);
-        
         uint256 proposal = governor.propose(targets, values, calldatas, "Test proposal");
         vm.roll(block.number +2);
         assertEq(uint256(governor.state(proposal)), uint(ProposalState.Active));
 
-        vm.startPrank(voter1);
-        governor.castVote(proposal, 1);
-        vm.stopPrank();
+        //let everyone vote for
+        address[3] memory voters = [voter1, voter2, voter3];
+        for(uint8 n=0; n<voters.length; n++) {
+            vm.startPrank(voters[n]);
+            governor.castVote(proposal, 1);
+            vm.stopPrank();
+        }
 
-        vm.startPrank(voter2);
-        governor.castVote(proposal, 1);
-        vm.stopPrank();
-
-        vm.startPrank(voter3);
-        governor.castVote(proposal, 1);
-        vm.stopPrank();
-
+        //roll forward
         vm.roll(block.number +50401);
         vm.warp(block.timestamp + 50401);
 
         uint256 votes = govToken.getVotes(voter3);
-        console.log("voting power:", votes);
-        console.log("num checkpoints:", govToken.numCheckpoints(voter1));
-
+        assertEq(govToken.getVotes(voter1), 100);
+        assertEq(govToken.getVotes(voter2), 100);
+        assertEq(govToken.getVotes(voter3), 100);
+        assertEq(govToken.numCheckpoints(voter1), 1);
+        assertEq(govToken.numCheckpoints(voter2), 1);
+        assertEq(govToken.numCheckpoints(voter3), 1);
         assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Succeeded));
-
-        //governor.queue(targets, values, calldatas, keccak256("Test proposal"));
-        //governor.execute(targets, values, calldatas, "Test proposal");
-        //assertEq(systemSettings.feeBps(), 1);
     }
     
     function testVoteExecute() public {
-        targets.push(address(systemSettings));
-        values.push(uint256(0));
-        calldatas.push(abi.encodeWithSignature("setFeeBps(uint256)", 1));
-
         assertEq(systemSettings.feeBps(), 0);
         vm.roll(block.number +1);
         
+        //create proposal
         uint256 proposal = governor.propose(targets, values, calldatas, "Test proposal");
         vm.roll(block.number +2);
         assertEq(uint256(governor.state(proposal)), uint(ProposalState.Active));
 
-        vm.startPrank(voter1);
-        governor.castVote(proposal, 1);
-        vm.stopPrank();
+        //let everyone vote for
+        address[3] memory voters = [voter1, voter2, voter3];
+        for(uint8 n=0; n<voters.length; n++) {
+            vm.startPrank(voters[n]);
+            governor.castVote(proposal, 1);
+            vm.stopPrank();
+        }
 
-        vm.startPrank(voter2);
-        governor.castVote(proposal, 1);
-        vm.stopPrank();
-
-        vm.startPrank(voter3);
-        governor.castVote(proposal, 1);
-        vm.stopPrank();
-
+        //roll forward
         vm.roll(block.number +50401);
         vm.warp(block.timestamp + 50401);
 
         assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Succeeded));
 
         bytes32 descriptionHash = keccak256(bytes("Test proposal"));
-
         assertEq(uint256(governor.state(proposal)), uint256(ProposalState.Succeeded));
-        vm.roll(block.number +1);
         vm.warp(block.timestamp + 999999);
 
         governor.execute(targets, values, calldatas, descriptionHash);
