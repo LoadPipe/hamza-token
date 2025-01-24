@@ -80,13 +80,13 @@ contract HamzaGovernor is
         return super._executor();
     }
 
-    function _getVotes(
+    /*function _getVotes(
         address account,
         uint256 blockNumber,
         bytes memory params
     ) internal view override(Governor, GovernorVotes) returns (uint256) {
-        return 100;
-    }
+        return token.getVotes(account, blockNumber, params);
+    }*/
 
     function supportsInterface(
         bytes4 interfaceId
