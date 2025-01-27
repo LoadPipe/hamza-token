@@ -4,164 +4,145 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./tokens/GovernanceToken.sol";
-import "./security/HasSecurityContext.sol"; 
-import {console} from "forge-std/console.sol";
+import "./security/HasSecurityContext.sol";
 
 contract GovernanceVault is HasSecurityContext {
     using SafeERC20 for IERC20;
     
-    IERC20 lootToken;
-    GovernanceToken governanceToken;
+    IERC20 public lootToken;
+    GovernanceToken public governanceToken;
     address public communityVault;
-
-    uint256 vestingPeriodSeconds = 30;
-    mapping(address => Deposit[]) public deposits;
-
+    uint256 public vestingPeriodSeconds;
+    
     struct Deposit {
         uint256 amount;
         uint256 stakedAt;
-        uint256 lastClaimAt;
+        bool rewardsDistributed;
     }
 
-    constructor(address looTokenAddress, GovernanceToken governanceTokenAddress, uint256 vestingPeriod) {
-        lootToken = IERC20(looTokenAddress);
-        governanceToken = governanceTokenAddress; 
+    mapping(address => Deposit[]) public deposits;
+
+    event Deposited(address indexed account, uint256 amount);
+    event Withdrawn(address indexed account, uint256 amount);
+    event RewardDistributed(address indexed staker, uint256 amount);
+
+    constructor(
+        address lootTokenAddress,
+        GovernanceToken governanceTokenAddress,
+        uint256 vestingPeriod
+    ) {
+        lootToken = IERC20(lootTokenAddress);
+        governanceToken = governanceTokenAddress;
         vestingPeriodSeconds = vestingPeriod;
     }
 
-    function depositFor(address account, uint256 amount) external {
-        deposits[account].push(Deposit(amount, block.timestamp, block.timestamp));
-        governanceToken.depositForGov(account, amount);
-    }
-
+    // deposit loot tokens into the vault
     function deposit(uint256 amount) external {
-        deposits[msg.sender].push(Deposit(amount, block.timestamp, block.timestamp));
-        governanceToken.depositFor(msg.sender, amount);
+        _processDeposit(msg.sender, amount);
+        lootToken.safeTransferFrom(msg.sender, address(this), amount);
     }
 
+    // deposit loot tokens on behalf of another account
+    function depositFor(address account, uint256 amount) external {
+        _processDeposit(account, amount);
+        lootToken.safeTransferFrom(msg.sender, address(this), amount);
+    }
+
+    // withdraw loot tokens from the vault
     function withdraw(uint256 amount) external {
-        uint256 requestedAmount = amount;
-        Deposit[] storage deps = deposits[msg.sender];
-        uint256 count = 0;
+        uint256 remaining = amount;
+        Deposit[] storage userDeposits = deposits[msg.sender];
 
-        while(amount > 0 && deps.length > 0) {
-            if (deps[0].stakedAt <= (block.timestamp - vestingPeriodSeconds)) {
-                Deposit storage depos = deps[0];
-
-                //this deposit is mature, and has enough or more than enough 
-                if (depos.amount >= amount) {
-                    depos.amount -= amount; 
-                    amount = 0;
-
-                //this deposit is mature, but does not have enough to cover the full amount
-                } else {
-                    amount -= depos.amount;
-                    depos.amount = 0;
-                }
-
-                //delete deposits that are empty
-                if (depos.amount == 0) {
-                    //TODO: not this
-                    for(uint256 n=0; n<deps.length-1; n++) {
-                        deps[n] = deps[n+1];
-                    }
-                    deps.pop();
-                }
+        while (remaining > 0 && userDeposits.length > 0) {
+            Deposit storage oldest = userDeposits[0];
+            require(block.timestamp >= oldest.stakedAt + vestingPeriodSeconds, "Deposit not vested");
+            
+            // Auto-distribute rewards before withdrawal
+            if (!oldest.rewardsDistributed) {
+                _distributeRewardsForDeposit(msg.sender, 0);
             }
-            else //here, we've gotten into the too-new ones 
-                break;
 
-            count += 1;
+            if (oldest.amount > remaining) {
+                oldest.amount -= remaining;
+                remaining = 0;
+            } else {
+                remaining -= oldest.amount;
+                _removeFirstDeposit(userDeposits);
+            }
         }
 
-        //if amount > 0, we've not found enough available to match the amount requested
-        if (amount > 0) {
-            revert("InsufficientBalance");
-        }
-
-        //otherwise, burn & return 
-        governanceToken.withdrawTo(msg.sender, requestedAmount);
+        governanceToken.burn(msg.sender, amount);
+        lootToken.safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, amount);
     }
 
-    /// @notice Sum of all new (unclaimed) rewards for this staker
-    function rewards(address staker) public view returns (uint256) {
+    // distribute rewards to a staker
+    function distributeRewards(address staker) public {
         uint256 totalReward;
         Deposit[] storage userDeposits = deposits[staker];
 
         for (uint256 i = 0; i < userDeposits.length; i++) {
             Deposit storage d = userDeposits[i];
-
-            uint256 claimStart = d.lastClaimAt;
-            uint256 maxClaimEnd = d.stakedAt + vestingPeriodSeconds;
-
-            // If we’ve already claimed everything from that deposit, skip
-            if (claimStart >= maxClaimEnd) {
-                continue;
-            }
-
-            // The portion we can claim is from [claimStart..claimEnd]
-            uint256 claimEnd = block.timestamp;
-            if (claimEnd > maxClaimEnd) {
-                claimEnd = maxClaimEnd;
-            }
-
-            if (claimEnd > claimStart) {
-                uint256 newSeconds = claimEnd - claimStart;
-                // Linear vest: reward = (depositAmount * fraction_of_vesting_period)
-                uint256 newReward = (d.amount * newSeconds) / vestingPeriodSeconds;
-                totalReward += newReward;
+            if (_isVested(d) && !d.rewardsDistributed) {
+                totalReward += d.amount; // 100% reward
+                d.rewardsDistributed = true;
             }
         }
-        return totalReward;
+
+        require(totalReward > 0, "No rewards available");
+        _processRewardDistribution(staker, totalReward);
     }
 
-    /// @notice Convenient batch version
-    function distributeRewardsMultiple(address[] calldata stakers) external {
-        for (uint256 i = 0; i < stakers.length; i++) {
-            distributeRewards(stakers[i]);
+    // helper function to process new deposits
+    function _processDeposit(address account, uint256 amount) private {
+        deposits[account].push(Deposit({
+            amount: amount,
+            stakedAt: block.timestamp,
+            rewardsDistributed: false
+        }));
+        governanceToken.mint(account, amount);
+        emit Deposited(account, amount);
+    }
+
+    // helper function to remove the first deposit from an array
+    function _removeFirstDeposit(Deposit[] storage deps) private {
+        if (deps.length > 0) {
+            deps[0] = deps[deps.length - 1];
+            deps.pop();
         }
     }
 
-    /**
-     * @notice Move real underlying tokens from the CommunityVault 
-     *         and stake them on behalf of `staker`. Then mark all
-     *         relevant deposit entries as claimed.
-     */
-    function distributeRewards(address staker) public {
-        console.log("Distributing rewards for", staker);
-        uint256 totalReward = rewards(staker);
-        if (totalReward == 0) {
-            return; 
-        }
-
-        // Mark all of the user’s deposits as “claimed through now”
-        Deposit[] storage userDeposits = deposits[staker];
-        for (uint256 i = 0; i < userDeposits.length; i++) {
-            userDeposits[i].lastClaimAt = block.timestamp;
-        }
-
-        console.log("got here");
-
-        // Now pull tokens from the CommunityVault to this vault
-        lootToken.safeTransferFrom(communityVault, address(this), totalReward);
-
-        console.log("Distributing", totalReward, "tokens to", staker);
-
-        // Next, stake them on behalf of the staker
-        lootToken.safeIncreaseAllowance(address(governanceToken), totalReward);
-
-        console.log("Depositing", totalReward, "tokens for", staker);
-
-        // Finally, deposit them for the staker. 
-        this.depositFor(staker, totalReward);
-
-        console.log("Done distributing rewards for", staker);
+    // helper function to check if a deposit is vested
+    function _isVested(Deposit memory d) private view returns (bool) {
+        return block.timestamp >= d.stakedAt + vestingPeriodSeconds;
     }
 
-    /**
-     * @notice Set which CommunityVault we pull reward tokens from
-     */
-    function setCommunityVault(address _communityVault) external /* onlyAdminOrSomething */ {
+    // helper function to distribute rewards for a specific deposit
+    function _distributeRewardsForDeposit(address staker, uint256 depositIndex) private {
+        Deposit storage d = deposits[staker][depositIndex];
+        if (!_isVested(d) || d.rewardsDistributed) return;
+
+        uint256 reward = d.amount;
+        d.rewardsDistributed = true;
+        _processRewardDistribution(staker, reward);
+    }
+
+    // helper function to process reward distribution
+    function _processRewardDistribution(address staker, uint256 amount) private {
+        lootToken.safeTransferFrom(communityVault, address(this), amount);
+        
+        deposits[staker].push(Deposit({
+            amount: amount,
+            stakedAt: block.timestamp,
+            rewardsDistributed: false
+        }));
+        
+        governanceToken.mint(staker, amount);
+        emit RewardDistributed(staker, amount);
+    }
+
+    // admin function to set the community vault address
+    function setCommunityVault(address _communityVault) external {
         require(_communityVault != address(0), "Invalid address");
         communityVault = _communityVault;
     }

@@ -65,89 +65,153 @@ contract FullRound is Test {
     }
 
     // End-to-End Flow: deposit + vest + distribute rewards
-    function testRewardsFlow() public {
+    function testVestingAndRewardsFlow() public {
         // Setup references
         CommunityVault cVault = CommunityVault(communityVault);
         GovernanceVault gVault = GovernanceVault(govVault);
         GovernanceToken gToken = GovernanceToken(govToken);
         IERC20 lToken = IERC20(lootToken);
 
-        // Check user has loot tokens (script mints 50 to user (OWNER_ONE))
+        // Check user has loot tokens (script mints 50 to user)
         uint256 userLootBalance = lToken.balanceOf(user);
-        console2.log("User's initial lootToken balance:", userLootBalance);
-        assertEq(userLootBalance, 50, "User should have 50 loot tokens");
+        console2.log("User's initial LOOT balance:", userLootBalance);
+        assertEq(userLootBalance, 50, "User should have 50 LOOT initially.");
 
-
-        //  The user deposits some loot into GovernanceVault
+        // STEP 1: User deposits LOOT into GovernanceVault
         uint256 depositAmount = 20;
 
-        vm.startPrank(user); // act as user
-
-        lToken.approve(address(gToken), depositAmount);
-
-        // deposit 20 loot tokens user gets 20 GovTokens minted
-        gVault.deposit(depositAmount);
-
+        vm.startPrank(user);
+        lToken.approve(address(gVault), depositAmount);
+        gVault.deposit(depositAmount); // This mints user 20 governance tokens
         vm.stopPrank();
 
-        // Check the deposit is recorded
-        (uint256 depositedAmt,,) = gVault.deposits(user, 0);
-        assertEq(depositedAmt, depositAmount, "Deposit record mismatch");
+        // Confirm deposit is recorded
+        (uint256 dAmount, uint256 dStakedAt, bool dRewardsDist) = gVault.deposits(user, 0);
+        assertEq(dAmount, depositAmount, "User's deposit amount mismatch");
+        assertEq(dRewardsDist, false, "rewardsDistributed should be false initially");
 
-        // After deposit user should have 30 loot left
+        // Check user LOOT and GOV balances after deposit
         userLootBalance = lToken.balanceOf(user);
-        assertEq(userLootBalance, 30, "User should have 30 loot tokens left");
-
-        // User also should have 20 GovTokens minted
         uint256 userGovBalance = gToken.balanceOf(user);
-        console2.log("User's govToken balance after deposit:", userGovBalance);
-        assertEq(userGovBalance, 20, "User's govToken minted mismatch");
-        
-        // (C) Warp forward in time so user can fully vest
-        skip(31); // 31 seconds
+        console2.log("User LOOT after deposit:", userLootBalance);
+        console2.log("User GOV after deposit:", userGovBalance);
 
-        // Now if we call gVault.rewards(user it should reflect almost full deposit as reward
+        assertEq(userLootBalance, 30, "User should have 30 LOOT left");
+        assertEq(userGovBalance, 20, "User should have 20 GOV tokens minted");
 
-        uint256 pendingReward = gVault.rewards(user);
-        console2.log("User's computed reward after 31s:", pendingReward);
-        // Because deposit = 20, vesting = 30 seconds if 31s have passed reward = 20
-        assertEq(pendingReward, 20, "Expected full deposit as reward");
+        // STEP 2: Move time forward so deposit is fully vested
+        skip(31); // skip 31 seconds
 
+        // STEP 3: Distribute Rewards
+        vm.prank(user);
+        gVault.distributeRewards(user);
 
-        // (D) Distribute Rewards from the CommunityVault
-        address[] memory stakers = new address[](1);
-        stakers[0] = user;
+        // After distribution, deposit #0's rewardsDistributed becomes true
+        (dAmount, , dRewardsDist) = gVault.deposits(user, 0);
+        console2.log("User's original deposit after distribution:", dAmount);
+        console2.log("rewardsDistributed for deposit #0:", dRewardsDist);
+        assertTrue(dRewardsDist, "Original deposit's rewardsDistributed should now be true");
 
-        // user allows govToken to stake there reward loot token
-        gVault.distributeRewardsMultiple(stakers);
+        // The totalReward = depositAmount = 20
+        (uint256 rewardDepositAmt, , bool rewardDepositDist) = gVault.deposits(user, 1);
+        console2.log("Reward deposit amount:", rewardDepositAmt);
+        assertEq(rewardDepositAmt, 20, "Reward deposit should be equal to the original deposit");
+        assertFalse(rewardDepositDist, "Reward deposit's rewardsDistributed should be false initially");
 
-        // Confirm the user now has 2 deposits in the gVault:
-        //   - The original deposit of 20
-        //   - The new deposit of 20 from rewards
-        (uint256 dep1Amt,,) = gVault.deposits(user, 0);
-        (uint256 dep2Amt,,) = gVault.deposits(user, 1);
-        console2.log("User deposit #1:", dep1Amt);
-        console2.log("User deposit #2 (reward deposit):", dep2Amt);
-        // The second deposit should be 20
-        assertEq(dep2Amt, 20, "Second deposit should be 20 from reward");
-
-        // Also confirm the user's govToken balance went from 20 -> 40
+        // Also user now gets minted additional 20 GOV tokens
         userGovBalance = gToken.balanceOf(user);
-        console2.log("User's govToken balance after reward distribution:", userGovBalance);
-        assertEq(userGovBalance, 40, "User govToken balance mismatch after reward distribution");
+        console2.log("User GOV after reward distribution:", userGovBalance);
+        assertEq(userGovBalance, 40, "User GOV should be 40 now");
+        userLootBalance = lToken.balanceOf(user);
+        console2.log("User LOOT after reward distribution:", userLootBalance);
 
-        // Confirm the CommunityVault's lootToken balance decreased by 20
-        uint256 commVaultLoot = lToken.balanceOf(communityVault);
-        console2.log("CommunityVault lootToken balance after distributing reward:", commVaultLoot);
-        // Initially the script minted 50 loot to the vault. It's now 30
-        // Because we pulled 20 in the reward distribution
-        assertEq(commVaultLoot, 30, "CommunityVault should have 30 left");
+        // Check the CommunityVault LOOT was transferred out
+        // The script minted 50 LOOT to CommunityVault, now it should have 30 left
+        uint256 commVaultLootBalance = lToken.balanceOf(communityVault);
+        console2.log("CommunityVault LOOT after distributing reward:", commVaultLootBalance);
+        assertEq(commVaultLootBalance, 30, "CommunityVault should have 30 LOOT after distributing 20");
 
-        // ---------------------------------------------------
-        // (E) Everything worked. 
-        //     The user has 40 GovTokens total. 
-        //     The user also can withdraw if they want.
-        // ---------------------------------------------------
-        console2.log("testRewardsFlow completed successfully.");
+        // STEP 4: Attempt partial withdrawal
+        // The user has two deposits in the vault:
+        //    deposit #0: amount=20, vested, rewardsDistributed=true
+        //    deposit #1: amount=20 (the reward deposit), stakedAt=block.timestamp (31s after original)
+        // The second deposit is not yet vested because it's brand new. 
+        // try to withdraw 10 tokens
+        uint256 partialWithdrawAmount = 10;
+
+        vm.startPrank(user);
+        gVault.withdraw(partialWithdrawAmount);
+        vm.stopPrank();
+
+        // The oldest deposit (#0) had 20. We withdrew 10, so deposit #0 now has 10 left.
+        (uint256 updatedDep0Amt,,) = gVault.deposits(user, 0);
+        console2.log("Updated deposit #0 after partial withdraw:", updatedDep0Amt);
+        assertEq(updatedDep0Amt, 10, "Deposit #0 should be reduced from 20 to 10");
+
+        // The user burned 10 GOV tokens upon withdrawal, so GOV should be 30
+        userGovBalance = gToken.balanceOf(user);
+        console2.log("User GOV after partial withdraw:", userGovBalance);
+        assertEq(userGovBalance, 30, "User should have burned 10 GOV, leaving 30");
+
+        // The user gets 10 LOOT back
+        userLootBalance = lToken.balanceOf(user);
+        console2.log("User LOOT after partial withdraw:", userLootBalance);
+        assertEq(userLootBalance, 40, "User LOOT should be 40 now (30 + 10 withdrawn)");
+
+        // STEP 5: Wait for the reward deposit (#1) to vest, then do a full withdrawal
+        skip(31); // skip 31 more seconds
+
+        // Now deposit #1 is also fully vested. Let's withdraw everything left, i.e. 30 tokens:
+        //   deposit #0 has 10 left
+        //   deposit #1 has 20
+        // total = 30
+        vm.startPrank(user);
+
+        // deposit count before withdraw
+        uint256 initialDepositCount = getDepositCount(gVault, user);
+        console2.log("User's initial deposit count:", initialDepositCount);
+
+        gVault.withdraw(30);
+        vm.stopPrank();
+
+        // After withdrawing 30 more deposit count should drop to 1 (1 for reward restaking)
+        uint256 depositCount = getDepositCount(gVault, user);
+        console2.log("User's deposit count after final withdraw:", depositCount);
+        assertEq(depositCount, 1, "One deposit should remain after withdrawing 30 total");
+
+        // The user also burns 30 GOV tokens
+        userGovBalance = gToken.balanceOf(user);
+        console2.log("Final user GOV balance:", userGovBalance);
+    
+        assertEq(userGovBalance, 20, "User should have 20 GOV after final withdraw");
+
+        // The user receives 30 LOOT in the final withdrawal
+        userLootBalance = lToken.balanceOf(user);
+        console2.log("Final user LOOT balance:", userLootBalance);
+        // Previously 40, plus 30 = 70
+        assertEq(userLootBalance, 70, "User should have 70 LOOT after final withdraw");
+
+        console2.log("testVestingAndRewardsFlow completed successfully.");
+    }
+
+    /**
+     * @dev Helper function to read how many deposits a user has in the GovernanceVault.
+     */
+    function getDepositCount(GovernanceVault gVault, address account) internal view returns (uint256) {
+        uint256 count;
+        try gVault.deposits(account, 0) returns (uint256, uint256, bool) {
+            // deposit 0 exists
+        } catch {
+            return 0;
+        }
+        // If deposit(0) works keep going until it fails
+        while (true) {
+            try gVault.deposits(account, count) returns (uint256, uint256, bool) {
+                count++;
+            } catch {
+                break;
+            }
+        }
+        return count;
     }
 }
