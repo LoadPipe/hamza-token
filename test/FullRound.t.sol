@@ -53,9 +53,7 @@ contract FullRound is Test {
         lootToken = script.hamzaToken();
     }
 
-    // ------------------------------------------------------
-    // 1. Basic Test: sanity-check the deployment
-    // ------------------------------------------------------
+    // Basic Test
     function testDeployment() public {
         assertTrue(baal != address(0), "Baal address is zero");
         assertTrue(communityVault != address(0), "CommunityVault address is zero");
@@ -66,9 +64,7 @@ contract FullRound is Test {
         assertTrue(lootToken != address(0), "Loot token address is zero");
     }
 
-    // ------------------------------------------------------
-    // 2. End-to-End Flow: deposit + vest + distribute rewards
-    // ------------------------------------------------------
+    // End-to-End Flow: deposit + vest + distribute rewards
     function testRewardsFlow() public {
         // Setup references
         CommunityVault cVault = CommunityVault(communityVault);
@@ -76,27 +72,20 @@ contract FullRound is Test {
         GovernanceToken gToken = GovernanceToken(govToken);
         IERC20 lToken = IERC20(lootToken);
 
-        // ---------------------------------------------------
-        // (A) Check user has loot tokens (script minted 50 to user)
-        // ---------------------------------------------------
+        // Check user has loot tokens (script mints 50 to user (OWNER_ONE))
         uint256 userLootBalance = lToken.balanceOf(user);
         console2.log("User's initial lootToken balance:", userLootBalance);
         assertEq(userLootBalance, 50, "User should have 50 loot tokens");
 
-        // ---------------------------------------------------
-        // (B) The user deposits some loot into GovernanceVault
-        //     -> must approve the GovernanceToken as spender
-        //     -> calls gVault.deposit(amount)
-        // ---------------------------------------------------
+
+        //  The user deposits some loot into GovernanceVault
         uint256 depositAmount = 20;
 
         vm.startPrank(user); // act as user
 
-        // Approve the "governanceToken" because depositFor(...) calls underlying.safeTransferFrom(account, this, amount)
-        // where "this" is the GovernanceToken contract
         lToken.approve(address(gToken), depositAmount);
 
-        // Now deposit 20 loot tokens → user gets 20 GovTokens minted
+        // deposit 20 loot tokens user gets 20 GovTokens minted
         gVault.deposit(depositAmount);
 
         vm.stopPrank();
@@ -105,7 +94,7 @@ contract FullRound is Test {
         (uint256 depositedAmt,,) = gVault.deposits(user, 0);
         assertEq(depositedAmt, depositAmount, "Deposit record mismatch");
 
-        // After deposit, user should have 30 loot left
+        // After deposit user should have 30 loot left
         userLootBalance = lToken.balanceOf(user);
         assertEq(userLootBalance, 30, "User should have 30 loot tokens left");
 
@@ -113,25 +102,19 @@ contract FullRound is Test {
         uint256 userGovBalance = gToken.balanceOf(user);
         console2.log("User's govToken balance after deposit:", userGovBalance);
         assertEq(userGovBalance, 20, "User's govToken minted mismatch");
-
-        // ---------------------------------------------------
+        
         // (C) Warp forward in time so user can fully vest
-        //     vestingPeriod is 30s from script
-        // ---------------------------------------------------
-        skip(31);  // alias for vm.warp(block.timestamp + 31)
+        skip(31); // 31 seconds
 
-        // Now if we call gVault.rewards(user), it should reflect almost full deposit as reward
+        // Now if we call gVault.rewards(user it should reflect almost full deposit as reward
 
         uint256 pendingReward = gVault.rewards(user);
         console2.log("User's computed reward after 31s:", pendingReward);
-        // Because deposit = 20, vesting = 30 seconds → if 31s have passed, reward = 20
+        // Because deposit = 20, vesting = 30 seconds if 31s have passed reward = 20
         assertEq(pendingReward, 20, "Expected full deposit as reward");
 
-        // ---------------------------------------------------
+
         // (D) Distribute Rewards from the CommunityVault
-        //     We'll do a batch call to distribute to [user].
-        //     Must be called by admin => let's impersonate `safe`
-        // ---------------------------------------------------
         address[] memory stakers = new address[](1);
         stakers[0] = user;
 

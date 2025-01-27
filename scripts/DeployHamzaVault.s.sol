@@ -10,6 +10,10 @@ import "../src/CommunityVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/GovernanceVault.sol";
 
+import "../src/HamzaGovernor.sol";
+import { HamzaGovernor } from "../src/HamzaGovernor.sol";
+import "@openzeppelin/contracts/governance/TimelockController.sol";
+
 
 /**
  * @title DeployHamzaVault
@@ -167,6 +171,16 @@ contract DeployHamzaVault is Script {
         govVault.setCommunityVault(address(vault));
 
         console2.log("GovernanceVault deployed at:", address(govVault));
+
+        address[] memory empty;
+
+        TimelockController timelock = new TimelockController(1, empty, empty, OWNER_ONE);
+
+        HamzaGovernor governor = new HamzaGovernor(govToken, timelock);
+
+        timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
+
+        console2.log("Governor deployed at:", address(governor));
 
         vm.stopBroadcast();
 
