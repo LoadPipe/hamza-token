@@ -12,6 +12,7 @@ mainnet = "https://mainnet.infura.io/v3/${process.env.SEPOLIA_API_KEY}"
 sepolia = "https://rpc.ankr.com/eth_sepolia"
 op_sepolia = "https://sepolia.optimism.io"
 op_mainnet = "https://mainnet.optimism.io"
+arbitrum = "https://arb1.arbitrum.io/rpc"
 
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
