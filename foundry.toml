@@ -2,7 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-test = "test-foundry"
+test = "test"
 viaIR = true
 optimizer = true
 optimizerRuns = 1000
