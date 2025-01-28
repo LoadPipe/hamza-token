@@ -61,6 +61,7 @@ contract HatsDeployment is Script {
     /**
      * @notice Runs the deployment. Returns the newly deployed safe address
      */
+
     function run() external returns (
         address safeAddress,
         address hatsAddress,
@@ -105,14 +106,15 @@ contract HatsDeployment is Script {
 
         address safeAddr = address(factory.createProxy(SAFE_SINGLETON, setupData));
         console2.log("Gnosis Safe deployed at:", safeAddr);
+        
         deployedSafe = safeAddr;
 
         // 4) Deploy Eligibility & Toggle modules
         eligibilityModule = new EligibilityModule(safeAddr);
         toggleModule      = new ToggleModule(safeAddr);
 
-        console2.log("EligibilityModule at:", address(eligibilityModule));
-        console2.log("ToggleModule at:     ", address(toggleModule));
+        console.log("EligibilityModule at:", address(eligibilityModule));
+        console.log("ToggleModule at:     ", address(toggleModule));
 
         // 5) Mint Top Hat to the Safe (via the Safe)
         {
@@ -192,15 +194,14 @@ contract HatsDeployment is Script {
             );
             execTransaction(safeAddr, address(hats), 0, data);
         }
-
-        console2.log("Arbiter Hat ID:", arbiterHatId);
-        console2.log("DAO Hat ID:    ", daoHatId);
-        console2.log("System Hat ID: ", systemHatId);
-        console2.log("Pauser Hat ID: ", pauserHatId);
+        console.log("Arbiter Hat ID:", arbiterHatId);
+        console.log("DAO Hat ID:    ", daoHatId);
+        console.log("System Hat ID: ", systemHatId);
+        console.log("Pauser Hat ID: ", pauserHatId);
 
         // 7) Deploy HatsSecurityContext & set role hats
         securityContext = new HatsSecurityContext(address(hats), adminHatId);
-        console2.log("HatsSecurityContext at:", address(securityContext));
+        console.log("HatsSecurityContext at:", address(securityContext));
 
         // 8) Configure eligibility + toggle modules
         {

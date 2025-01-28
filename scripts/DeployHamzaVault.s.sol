@@ -10,10 +10,10 @@ import "../src/CommunityVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/GovernanceVault.sol";
 
+
 import "../src/HamzaGovernor.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
-
 
 /**
  * @title DeployHamzaVault
@@ -25,6 +25,7 @@ contract DeployHamzaVault is Script {
     address constant BAAL_SUMMONER = 0x33267E2d3decebCae26FA8D837Ef3F7608367ab2; 
 
     // addresses for loot recipients, etc.
+
     address public constant OWNER_ONE = 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8;
     address constant OWNER_TWO = 0x1542612fee591eD35C05A3E980bAB325265c06a3;
 
@@ -73,7 +74,7 @@ contract DeployHamzaVault is Script {
         CommunityVault vault = new CommunityVault(hatsSecurityContextAddr);
 
         console2.log("CommunityVault deployed at:", address(vault));
-
+        
         // 3) Summon the Baal DAO
         BaalSummoner summoner = BaalSummoner(BAAL_SUMMONER);
         console2.log("BaalSummoner at:", address(summoner));
