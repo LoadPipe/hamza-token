@@ -31,7 +31,7 @@ contract HatsDeployment is Script {
     address constant SAFE_SINGLETON = 0x69f4D1788e39c87893C980c06EdF4b7f686e2938;
     address constant SAFE_FACTORY  = 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC;
 
-    // The second owner (besides adminAddress1)
+    // The second owner (besides adminAddress1 which is automatically the sender)
     address public adminAddress2 = 0x1542612fee591eD35C05A3E980bAB325265c06a3; // hudson's address: 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8
 
     // The newly deployed Safe
