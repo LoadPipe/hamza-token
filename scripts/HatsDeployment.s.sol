@@ -113,8 +113,8 @@ contract HatsDeployment is Script {
         eligibilityModule = new EligibilityModule(safeAddr);
         toggleModule      = new ToggleModule(safeAddr);
 
-        console.log("EligibilityModule at:", address(eligibilityModule));
-        console.log("ToggleModule at:     ", address(toggleModule));
+        console2.log("EligibilityModule at:", address(eligibilityModule));
+        console2.log("ToggleModule at:     ", address(toggleModule));
 
         // 5) Mint Top Hat to the Safe (via the Safe)
         {
@@ -194,14 +194,14 @@ contract HatsDeployment is Script {
             );
             execTransaction(safeAddr, address(hats), 0, data);
         }
-        console.log("Arbiter Hat ID:", arbiterHatId);
-        console.log("DAO Hat ID:    ", daoHatId);
-        console.log("System Hat ID: ", systemHatId);
-        console.log("Pauser Hat ID: ", pauserHatId);
+        console2.log("Arbiter Hat ID:", arbiterHatId);
+        console2.log("DAO Hat ID:    ", daoHatId);
+        console2.log("System Hat ID: ", systemHatId);
+        console2.log("Pauser Hat ID: ", pauserHatId);
 
         // 7) Deploy HatsSecurityContext & set role hats
         securityContext = new HatsSecurityContext(address(hats), adminHatId);
-        console.log("HatsSecurityContext at:", address(securityContext));
+        console2.log("HatsSecurityContext at:", address(securityContext));
 
         // 8) Configure eligibility + toggle modules
         {

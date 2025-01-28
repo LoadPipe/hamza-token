@@ -6,6 +6,7 @@ import "../scripts/DeployHamzaVault.s.sol";
 import "../src/CommunityVault.sol";
 import "../src/GovernanceVault.sol";
 import "../src/tokens/GovernanceToken.sol";
+import "../src/HamzaGovernor.sol";
 
 /**
  * @dev Example Foundry test that deploys all contracts using DeployHamzaVault,
@@ -21,6 +22,7 @@ contract FullRound is Test {
     address public govVault;
     address public safe;
     address public hatsCtx;
+    address payable public governor;
 
     // Extra fields from script
     uint256 public adminHatId;
@@ -47,10 +49,12 @@ contract FullRound is Test {
 
         // The script sets OWNER_ONE as a constant
         admin = script.OWNER_ONE(); 
-        user = script.OWNER_ONE();  // We'll treat OWNER_ONE as our "end-user" for demonstration
+        user = script.OWNER_ONE();  // user is the same as admin in this test
 
         // This is the loot token minted by the Baal
         lootToken = script.hamzaToken();
+
+        governor = script.governorAddr();
     }
 
     // Basic Test
@@ -190,8 +194,6 @@ contract FullRound is Test {
         console2.log("Final user LOOT balance:", userLootBalance);
         // Previously 40, plus 30 = 70
         assertEq(userLootBalance, 70, "User should have 70 LOOT after final withdraw");
-
-        console2.log("testVestingAndRewardsFlow completed successfully.");
     }
 
     /**

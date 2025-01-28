@@ -35,6 +35,8 @@ contract DeployHamzaVault is Script {
 
     address public hamzaToken;
 
+    address payable public governorAddr;
+
     function run() external 
     returns (
         address hamzaBaal,
@@ -182,6 +184,8 @@ contract DeployHamzaVault is Script {
         timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
 
         console2.log("Governor deployed at:", address(governor));
+
+        governorAddr = payable(address(governor));
 
         vm.stopBroadcast();
 
