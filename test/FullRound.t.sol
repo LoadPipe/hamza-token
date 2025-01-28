@@ -7,6 +7,7 @@ import "../src/CommunityVault.sol";
 import "../src/GovernanceVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/HamzaGovernor.sol";
+import "../src/settings/SystemSettings.sol";
 
 /**
  * @dev Example Foundry test that deploys all contracts using DeployHamzaVault,
@@ -24,6 +25,8 @@ contract FullRound is Test {
     address public hatsCtx;
     address payable public governor;
 
+    address public systemSettings;
+
     // Extra fields from script
     uint256 public adminHatId;
     address public admin;
@@ -31,6 +34,17 @@ contract FullRound is Test {
 
     // A "normal user" who will do deposits (script.OWNER_ONE)
     address public user;
+
+    enum ProposalState {
+        Pending,
+        Active,
+        Canceled,
+        Defeated,
+        Succeeded,
+        Queued,
+        Expired,
+        Executed
+    }
 
     function setUp() public {
         // Run the deployment script
@@ -55,6 +69,8 @@ contract FullRound is Test {
         lootToken = script.hamzaToken();
 
         governor = script.governorAddr();
+
+        systemSettings = script.systemSettingsAddr();
     }
 
     // Basic Test
@@ -194,6 +210,69 @@ contract FullRound is Test {
         console2.log("Final user LOOT balance:", userLootBalance);
         // Previously 40, plus 30 = 70
         assertEq(userLootBalance, 70, "User should have 70 LOOT after final withdraw");
+
+        // voting 
+        HamzaGovernor gov = HamzaGovernor(governor);
+        vm.startPrank(user);
+        
+        address[] memory targets = new address[](1);
+        targets[0] = systemSettings;
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+        bytes[] memory calldatas = new bytes[](1);
+        calldatas[0] = abi.encodeWithSignature("setFeeBps(uint256)", 1);
+
+        gov.propose(targets, values, calldatas, "Test Proposal");
+
+        // Check the proposal
+        uint256 proposal = gov.propose(targets, values, calldatas, "Test proposal");
+        console2.log("Proposal ID:", proposal);
+        assertGt(proposal, 0, "Proposal ID should be greater than 0");
+        
+        // Move time forward
+        vm.roll(block.number +2);
+
+        // Check proposal state
+        uint256 state = uint256(gov.state(proposal));
+        console2.log("Proposal state:", state);
+        assertEq(state, uint256(ProposalState.Active), "Proposal should be active");
+
+        // Vote for the proposal
+        gov.castVote(proposal, 1);
+
+        // Move time forward
+        vm.roll(block.number +50401);
+
+        // Check the number of votes and checkpoints
+        uint256 votes = gToken.getVotes(user);
+        console2.log("Voting power:", votes);
+        assertEq(votes, 20, "Voting power should be 20");
+
+        // Check the proposal state
+        state = uint256(gov.state(proposal));
+        console2.log("Proposal state after voting:", state);
+        assertEq(state, uint256(ProposalState.Succeeded), "Proposal should have succeeded");
+
+        //queue and execute the proposal
+        gov.queue(targets, values, calldatas, keccak256("Test proposal"));
+
+        //wait
+        vm.warp(block.timestamp + 2);
+
+        // execute the proposal
+        gov.execute(targets, values, calldatas, keccak256("Test proposal"));
+
+        // Check the proposal state
+        state = uint256(gov.state(proposal));
+        console2.log("Proposal state after execution:", state);
+        assertEq(state, uint256(ProposalState.Executed), "Proposal should have been executed");
+
+        // Check the system settings
+        SystemSettings sysSettings = SystemSettings(systemSettings);
+        console2.log("Fee basis points:", sysSettings.feeBps());
+        assertEq(sysSettings.feeBps(), 1, "Fee basis points should be 1");
+
+
     }
 
     /**

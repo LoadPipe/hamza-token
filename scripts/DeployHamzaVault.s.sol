@@ -9,6 +9,7 @@ import "@baal/BaalSummoner.sol";
 import "../src/CommunityVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/GovernanceVault.sol";
+import "../src/settings/SystemSettings.sol";
 
 
 import "../src/HamzaGovernor.sol";
@@ -36,6 +37,8 @@ contract DeployHamzaVault is Script {
     address public hamzaToken;
 
     address payable public governorAddr;
+
+    address public systemSettingsAddr;
 
     function run() external 
     returns (
@@ -181,7 +184,12 @@ contract DeployHamzaVault is Script {
 
         HamzaGovernor governor = new HamzaGovernor(govToken, timelock);
 
+        SystemSettings systemSettings = new SystemSettings(IHatsSecurityContext(hatsSecurityContextAddr), safeAddr, 0);
+
+        systemSettingsAddr = address(systemSettings);
+
         timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
+        timelock.grantRole(0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1, address(governor));
 
         console2.log("Governor deployed at:", address(governor));
 
