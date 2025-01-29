@@ -16,6 +16,8 @@ import "../src/HamzaGovernor.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 
+import "forge-std/StdJson.sol";
+
 /**
  * @title DeployHamzaVault
  * @notice Runs the HatsDeployment script first, then uses the
@@ -26,9 +28,10 @@ contract DeployHamzaVault is Script {
     address constant BAAL_SUMMONER = 0x33267E2d3decebCae26FA8D837Ef3F7608367ab2; 
 
     // addresses for loot recipients, etc.
+    
 
-    address public constant OWNER_ONE = 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8;
-    address constant OWNER_TWO = 0x1542612fee591eD35C05A3E980bAB325265c06a3;
+    address public OWNER_ONE;
+    address public OWNER_TWO;
 
     uint256 internal deployerPk;
 
@@ -50,6 +53,11 @@ contract DeployHamzaVault is Script {
         address hatsSecurityContext
       ) 
     {
+
+        string memory config = vm.readFile("./config.json");
+
+        OWNER_ONE = stdJson.readAddress(config, ".owners.ownerOne");
+        OWNER_TWO = stdJson.readAddress(config, ".owners.ownerTwo");
 
         // 1) Deploy all hats + new Gnosis Safe
         HatsDeployment hatsDeployment = new HatsDeployment();
