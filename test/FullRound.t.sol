@@ -2,8 +2,6 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import "forge-std/StdJson.sol"; // for parsing config
-import "../scripts/DeployHamzaVault.s.sol";
 
 import "../src/CommunityVault.sol";
 import "../src/GovernanceVault.sol";
@@ -11,82 +9,12 @@ import "../src/tokens/GovernanceToken.sol";
 import "../src/HamzaGovernor.sol";
 import "../src/settings/SystemSettings.sol";
 
+import "./DeploymentSetup.t.sol";
+
 /**
- * @dev Example Foundry test that deploys all contracts using DeployHamzaVault,
- *      then verifies deposits and rewards logic, now referencing config.json.
+ * @dev FullRound contract tests
  */
-contract FullRound is Test {
-    using stdJson for string;
-
-    DeployHamzaVault public script;
-
-    // Addresses returned from the script
-    address public baal;
-    address payable public communityVault;
-    address public govToken;
-    address public govVault;
-    address public safe;
-    address public hatsCtx;
-    address payable public governor;
-    address public systemSettings;
-
-    // Extra fields from script
-    uint256 public adminHatId;
-    address public admin;
-    address public lootToken;
-
-    // A "normal user" who will do deposits (script.OWNER_ONE)
-    address public user;
-
-    // Values loaded from config
-    uint256 public userLootAmountFromConfig;  // e.g. "50"
-    uint256 public vestingPeriodFromConfig;   // e.g. "30"
-    uint256 public initialFeeBps;            // e.g. "0"
-    uint256 public timeLockDelay;
-
-    // We define a simple enum to match the Governor's state() return
-    enum ProposalState {
-        Pending,
-        Active,
-        Canceled,
-        Defeated,
-        Succeeded,
-        Queued,
-        Expired,
-        Executed
-    }
-
-    function setUp() public {
-        // 1) Read from config.json
-        string memory config = vm.readFile("./config.json");
-        userLootAmountFromConfig = config.readUint(".baal.userLootAmount");
-        vestingPeriodFromConfig  = config.readUint(".governanceVault.vestingPeriod");
-        initialFeeBps            = config.readUint(".systemSettings.feeBPS");
-        timeLockDelay            = config.readUint(".governor.timelockDelay");
-        
-
-        // 2) Run the deployment script
-        script = new DeployHamzaVault();
-        (
-            baal,
-            communityVault,
-            govToken,
-            govVault,
-            safe,
-            hatsCtx
-        ) = script.run();
-
-        adminHatId = script.adminHatId();
-
-        // The script sets OWNER_ONE to vm.addr(vm.envUint("PRIVATE_KEY"))
-        admin = script.OWNER_ONE(); 
-        user  = script.OWNER_ONE();  // user is the same as admin in this test
-
-        // This is the loot token minted by the Baal
-        lootToken = script.hamzaToken();
-        governor  = script.governorAddr();
-        systemSettings = script.systemSettingsAddr();
-    }
+contract FullRound is DeploymentSetup {
 
     // Basic deployment checks
     function testDeployment() public {
@@ -306,26 +234,5 @@ contract FullRound is Test {
         SystemSettings sysSettings = SystemSettings(systemSettings);
         console2.log("Fee basis points:", sysSettings.feeBps());
         assertEq(sysSettings.feeBps(), 1, "Fee basis points should be 1 after proposal");
-    }
-
-    /**
-     * @dev Helper function to read how many deposits a user has in the GovernanceVault.
-     */
-    function getDepositCount(GovernanceVault gVault, address account) internal view returns (uint256) {
-        uint256 count;
-        try gVault.deposits(account, 0) returns (uint256, uint256, bool) {
-            // deposit(0) exists
-        } catch {
-            return 0;
-        }
-        // If deposit(0) works, keep incrementing until it fails
-        while (true) {
-            try gVault.deposits(account, count) returns (uint256, uint256, bool) {
-                count++;
-            } catch {
-                break;
-            }
-        }
-        return count;
     }
 }
