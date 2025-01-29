@@ -16,9 +16,6 @@ jobs:
         with: 
           submodules: recursive
 
-      - name: Initialize Submodules
-        run: git submodule update --init --recursive
-        
       # Install Foundry
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
