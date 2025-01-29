@@ -24,4 +24,4 @@ jobs:
 
       # Run Foundry tests
       - name: Run Foundry Tests (Sepolia Fork)
-        run: forge test -vvv --via-ir --optimizer-runs 200 --fork-url https://sepolia.drpc.org
+        run: forge test -vvv --via-ir --optimizer-runs 1100 --fork-url https://sepolia.drpc.org
