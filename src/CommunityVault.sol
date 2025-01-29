@@ -4,7 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./security/HasSecurityContext.sol"; 
 import "./security/Roles.sol";
-import "./security/IHatsSecurityContext.sol";         
+import "./security/IHatsSecurityContext.sol";
+import "./GovernanceVault.sol";      
 
 /**
  * @title CommunityVault
@@ -17,7 +18,7 @@ contract CommunityVault is HasSecurityContext {
     mapping(address => uint256) public tokenBalances;
 
     // Governance staking contract address
-    address public governanceStakingContract;
+    address public governanceVault;
 
     // Events
     event Deposit(address indexed token, address indexed from, uint256 amount);
@@ -108,42 +109,22 @@ contract CommunityVault is HasSecurityContext {
     }
 
     /**
-     * @dev Distribute rewards for governance staking
-     * @param token The token to distribute
-     * @param recipients List of recipients
-     * @param amounts List of amounts
-     * @notice will update to only use hamza token 
-     */
-    function distributeGovernanceRewards(
-        address token,
-        address[] calldata recipients,
-        uint256[] calldata amounts
-    ) external onlyRole(Roles.ADMIN_ROLE) {
-        require(recipients.length == amounts.length, "Mismatched arrays");
+    * @dev Set the governance vault address and grant it unlimited allowance for `lootToken`.
+    *      Must be called by an admin role or similar.
+    * @param vault The address of the governance vault
+    * @param lootToken The address of the ERC20 token for which you'd like to grant unlimited allowance
+    */
+    function setGovernanceVault(address vault, address lootToken)
+        external
+    {
+        require(vault != address(0), "Invalid staking contract address");
+        require(lootToken != address(0), "Invalid loot token address");
 
-        for (uint256 i = 0; i < recipients.length; i++) {
-            require(tokenBalances[token] >= amounts[i], "Insufficient balance");
+        governanceVault = vault;
 
-            if (token == address(0)) {
-                revert("ETH distribution not allowed");
-            } else {
-                // ERC20 distribution
-                IERC20(token).safeTransfer(recipients[i], amounts[i]);
-            }
-
-            tokenBalances[token] -= amounts[i];
-
-            emit RewardDistributed(token, recipients[i], amounts[i]);
-        }
-    }
-
-    /**
-     * @dev Set the governance staking contract
-     * @param stakingContract The address of the staking contract
-     */
-    function setGovernanceStakingContract(address stakingContract) external onlyRole(Roles.ADMIN_ROLE) {
-        require(stakingContract != address(0), "Invalid staking contract address");
-        governanceStakingContract = stakingContract;
+        // Best practice when changing allowances:
+        IERC20(lootToken).safeApprove(vault, 0);
+        IERC20(lootToken).safeApprove(vault, type(uint256).max);
     }
 
     /**
