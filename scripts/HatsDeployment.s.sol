@@ -13,11 +13,11 @@ interface IGnosisSafe {
 
 // Hats Protocol
 import { Hats } from "@hats-protocol/Hats.sol";
-import { EligibilityModule } from "../src/security/hats/EligibilityModule.sol";
-import { ToggleModule } from "../src/security/hats/ToggleModule.sol";
-import { HatsSecurityContext } from "../src/security/HatsSecurityContext.sol";
-import { IHatsSecurityContext } from "../src/security/IHatsSecurityContext.sol";
-import { Roles } from "../src/security/Roles.sol";
+import { EligibilityModule } from "@hamza-escrow/hats/EligibilityModule.sol";
+import { ToggleModule } from "@hamza-escrow/hats/ToggleModule.sol";
+import { HatsSecurityContext } from "@hamza-escrow/HatsSecurityContext.sol";
+import { IHatsSecurityContext } from "@hamza-escrow/IHatsSecurityContext.sol";
+import { Roles } from "@hamza-escrow/Roles.sol";
 
 import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
 
@@ -321,13 +321,6 @@ contract HatsDeployment is Script {
                 Hats.mintHat.selector,
                 daoHatId,
                 adminAddress1
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
-
-            data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                daoHatId,
-                adminAddress2
             );
             execTransaction(safeAddr, address(hats), 0, data);
         }

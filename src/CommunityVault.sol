@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./security/HasSecurityContext.sol"; 
-import "./security/Roles.sol";
-import "./security/IHatsSecurityContext.sol";
+import "@hamza-escrow/HasSecurityContext.sol";
+import "@hamza-escrow/Roles.sol";
+import "@hamza-escrow/IHatsSecurityContext.sol";
 import "./GovernanceVault.sol";      
 
 /**

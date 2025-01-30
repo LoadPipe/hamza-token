@@ -2,11 +2,11 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import "../src/security/HatsSecurityContext.sol";
+import "@hamza-escrow/HatsSecurityContext.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/HamzaGovernor.sol";
 import "../src/utils/TestToken.sol";
-import "../src/settings/SystemSettings.sol";
+import "@hamza-escrow/SystemSettings.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
 import { Hats } from "@hats-protocol/Hats.sol";
@@ -25,6 +25,8 @@ contract VotingTest is Test {
     address[] targets;
     uint256[] values;
     bytes[] calldatas;
+
+    uint256 public adminHatId;
 
     enum ProposalState {
         Pending,
@@ -80,6 +82,29 @@ contract VotingTest is Test {
         timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
         timelock.grantRole(0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1, address(governor));
 
+        // 1) Grab the Hats protocol reference & adminHatId from our security context
+        Hats hats = Hats(securityContext.hats()); 
+
+        // 2) Create a new child-hat under that adminHatId (if it doesn't already exist)
+        //    In real deployments, you'd call createHat via Gnosis Safe that holds the top-hat,
+        //    but here we assume your `admin` can create it for testing.
+        uint256 daoHatId = hats.getNextId(adminHatId);
+        hats.createHat(
+            adminHatId,
+            "DAO Hat",   // optional name
+            2,          // maxSupply
+            address(1), // eligibility module (none in this simple test)
+            address(1), // toggle module (none in this simple test)
+            true,       // mutable
+            ""          // details
+        );
+
+        // 3) Tell the security context that "DAO_ROLE" = our newly created daoHatId
+        securityContext.setRoleHat(Roles.DAO_ROLE, daoHatId);
+
+        // 4) Mint the DAO hat to the Timelock
+        hats.mintHat(daoHatId, address(timelock));
+
         //prepare proposal data
         targets.push(address(systemSettings));
         values.push(uint256(0));
@@ -89,8 +114,14 @@ contract VotingTest is Test {
     function createHatsSecurityContext() internal returns (HatsSecurityContext) {
         address hatsAddress = 0x3bc1A0Ad72417f2d411118085256fC53CBdDd137;
         Hats hats = Hats(hatsAddress);
-        uint256 adminHatId = uint256(hats.lastTopHatId()) << 224;
+        adminHatId = uint256(hats.lastTopHatId()) << 224;
+        // mint top-hat to admin
+        hats.mintTopHat(admin, "ipfs://bafkreih3vqseitn7pijlkl2jcawbjrhae3dfb2pakqtgd4epvxxfulwoqq","");
+        adminHatId = uint256(hats.lastTopHatId()) << 224;
+
         securityContext = new HatsSecurityContext(hatsAddress, adminHatId);
+
+
         return securityContext;
     }
 

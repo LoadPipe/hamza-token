@@ -9,7 +9,7 @@ import "@baal/BaalSummoner.sol";
 import "../src/CommunityVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/GovernanceVault.sol";
-import "../src/settings/SystemSettings.sol";
+import "@hamza-escrow/SystemSettings.sol";
 
 import "../src/HamzaGovernor.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
@@ -18,6 +18,8 @@ import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "forge-std/StdJson.sol";
 import "forge-std/Script.sol";
 import { console2 } from "forge-std/console2.sol";
+
+import { SafeTransactionHelper } from "./utils/SafeTransactionHelper.s.sol";
 
 /**
  * @title DeployHamzaVault
@@ -232,6 +234,25 @@ contract DeployHamzaVault is Script {
         // 13) Grant roles in Timelock
         timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
         timelock.grantRole(0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1, address(governor));
+
+        // 14) grant timelock dao role to the governor
+
+         {
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                daoHatId,
+                address(timelock)
+            );
+
+            SafeTransactionHelper.execTransaction(
+                safeAddr,
+                hats,
+                0,
+                data,
+                OWNER_ONE
+            );
+            console2.log("DAO hat minted to Timelock:", address(timelock));
+        }
 
         vm.stopBroadcast();
 
