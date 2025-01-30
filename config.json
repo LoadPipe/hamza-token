@@ -24,5 +24,8 @@
     },
     "systemSettings": {
         "feeBPS": 0
+    },
+    "escrow": {
+        "autoRelease": true
     }
 }

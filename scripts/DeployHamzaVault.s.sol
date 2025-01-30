@@ -9,7 +9,10 @@ import "@baal/BaalSummoner.sol";
 import "../src/CommunityVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/GovernanceVault.sol";
+
 import "@hamza-escrow/SystemSettings.sol";
+import "@hamza-escrow/PaymentEscrow.sol";
+import "@hamza-escrow/EscrowMulticall.sol";
 
 import "../src/HamzaGovernor.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
@@ -103,6 +106,7 @@ contract DeployHamzaVault is Script {
         bool pauseSharesOnInit         = stdJson.readBool(config, ".baal.pauseSharesOnInit");
         bool pauseLootOnInit           = stdJson.readBool(config, ".baal.pauseLootOnInit");
         uint256 sharesToMintForSafe    = stdJson.readUint(config, ".baal.safeSharesToMint");
+        bool autoRelease               = stdJson.readBool(config, ".escrow.autoRelease");
 
         // pass these into the Baal initialization
         address _forwarder       = address(0);
@@ -253,6 +257,19 @@ contract DeployHamzaVault is Script {
             );
             console2.log("DAO hat minted to Timelock:", address(timelock));
         }
+
+        // 15) Deploy PaymentEscrow 
+        PaymentEscrow paymentEscrow = new PaymentEscrow(
+            IHatsSecurityContext(hatsSecurityContextAddr),
+            ISystemSettings(address(systemSettings)),
+            autoRelease
+        );
+
+        // 16) Deploy EscrowMulticall
+        EscrowMulticall escrowMulticall = new EscrowMulticall();
+
+        console2.log("PaymentEscrow deployed at:", address(paymentEscrow));
+        console2.log("EscrowMulticall deployed at:", address(escrowMulticall));
 
         vm.stopBroadcast();
 
