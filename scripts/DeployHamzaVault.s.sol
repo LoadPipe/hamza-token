@@ -9,49 +9,69 @@ import "@baal/BaalSummoner.sol";
 import "../src/CommunityVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/GovernanceVault.sol";
-import "../src/settings/SystemSettings.sol";
 
+import "@hamza-escrow/SystemSettings.sol";
+import "@hamza-escrow/PaymentEscrow.sol";
+import "@hamza-escrow/EscrowMulticall.sol";
 
 import "../src/HamzaGovernor.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 
+import "forge-std/StdJson.sol";
+import "forge-std/Script.sol";
+import { console2 } from "forge-std/console2.sol";
+
+import { SafeTransactionHelper } from "./utils/SafeTransactionHelper.s.sol";
+
 /**
  * @title DeployHamzaVault
  * @notice Runs the HatsDeployment script first, then uses the
- *         returned Safe address to deploy and configure the Baal DAO.
+ *         returned Safe address to deploy and configure the Baal DAO,
+ *         the community vault, governance token, governance vault, etc.
  */
 contract DeployHamzaVault is Script {
     // (A) Deployed BaalSummoner on Sepolia
     address constant BAAL_SUMMONER = 0x33267E2d3decebCae26FA8D837Ef3F7608367ab2; 
 
-    // addresses for loot recipients, etc.
-
-    address public constant OWNER_ONE = 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8;
-    address constant OWNER_TWO = 0x1542612fee591eD35C05A3E980bAB325265c06a3;
+    // Key addresses & params
+    address public OWNER_ONE;
+    address public OWNER_TWO;  // read from config
 
     uint256 internal deployerPk;
 
-    uint256 public adminHatId;
+    uint256 public adminHatId; // from HatsDeployment
 
-    address public hamzaToken;
-
+    address public hamzaToken; // the BAAL's loot token
     address payable public governorAddr;
 
     address public systemSettingsAddr;
 
-    function run() external 
-    returns (
-        address hamzaBaal,
-        address payable communityVault,
-        address governanceToken,
-        address governanceVault,
-        address safeAddress,
-        address hatsSecurityContext
-      ) 
+    function run()
+        external
+        returns (
+            address hamzaBaal,
+            address payable communityVault,
+            address governanceToken,
+            address governanceVault,
+            address safeAddress,
+            address hatsSecurityContext
+        )
     {
+        // 1) Read config file
+        string memory config = vm.readFile("./config.json");
 
-        // 1) Deploy all hats + new Gnosis Safe
+        // 2) Set up owners
+        deployerPk = vm.envUint("PRIVATE_KEY");
+        OWNER_ONE = vm.addr(deployerPk);
+
+        // Read the second owner from config
+        OWNER_TWO = stdJson.readAddress(config, ".owners.ownerTwo");
+
+        console2.log("Owner One (from PRIVATE_KEY):", OWNER_ONE);
+        console2.log("Owner Two (from config):     ", OWNER_TWO);
+
+        // 3) Deploy all hats + new Gnosis Safe
         HatsDeployment hatsDeployment = new HatsDeployment();
         (
             address safeAddr,
@@ -67,56 +87,58 @@ contract DeployHamzaVault is Script {
         ) = hatsDeployment.run();
 
         adminHatId = _adminHatId;
-    
-
         console2.log("Using Safe from HatsDeployment at:", safeAddr);
 
-        deployerPk = vm.envUint("PRIVATE_KEY");
+        // 4) Start broadcast for subsequent deployments
         vm.startBroadcast(deployerPk);
 
-
-        // 2) Deploy the Community Vault
+        // 5) Deploy the Community Vault
         CommunityVault vault = new CommunityVault(hatsSecurityContextAddr);
-
         console2.log("CommunityVault deployed at:", address(vault));
-        
-        // 3) Summon the Baal DAO
+
+        // 6) Summon the Baal DAO
         BaalSummoner summoner = BaalSummoner(BAAL_SUMMONER);
         console2.log("BaalSummoner at:", address(summoner));
 
-        // Prepare initialization params for Baal
-        string memory name       = "Hamza Shares";   
-        string memory symbol     = "HS";
+        // read BAAL parameters from config
+        string memory sharesName       = stdJson.readString(config, ".baal.sharesName");
+        string memory sharesSymbol     = stdJson.readString(config, ".baal.sharesSymbol");
+        bool pauseSharesOnInit         = stdJson.readBool(config, ".baal.pauseSharesOnInit");
+        bool pauseLootOnInit           = stdJson.readBool(config, ".baal.pauseLootOnInit");
+        uint256 sharesToMintForSafe    = stdJson.readUint(config, ".baal.safeSharesToMint");
+        bool autoRelease               = stdJson.readBool(config, ".escrow.autoRelease");
+
+        // pass these into the Baal initialization
         address _forwarder       = address(0);
         address _lootToken       = address(0);
         address _sharesToken     = address(0);
         address _communityVault  = address(vault);
 
-        // These params are for the custom Baal
+        // Build the initParams for Baal
         bytes memory initParams = abi.encode(
-            name,
-            symbol,
-            address(0), //setups safe 
+            sharesName,
+            sharesSymbol,
+            address(0), // setUp safe 
             _forwarder,
             _lootToken,
             _sharesToken,
             _communityVault
         );
 
-        // 4) define the initActions for Baal
+        // 7) Build the initActions for Baal
 
-        // (A) Mint 1 share to the Safe (admin multisig)
+        // (A) Mint shares to the Safe
         bytes memory mintSharesCall = abi.encodeWithSelector(
             Baal.mintShares.selector,
             _singleAddressArray(safeAddr),
-            _singleUint256Array(1)
+            _singleUint256Array(sharesToMintForSafe) // from config
         );
 
-        // (B) Unpause loot token transfers, keep shares paused
-        bytes memory unpauseLootCall = abi.encodeWithSelector(
+        // (B) Set the initial pause states (loot is unpaused, shares can be paused, etc.)
+        bytes memory setAdminConfigCall = abi.encodeWithSelector(
             Baal.setAdminConfig.selector,
-            true,   // pauseShares = true
-            false   // pauseLoot   = false
+            pauseSharesOnInit, // pauseShares
+            pauseLootOnInit    // pauseLoot
         );
 
         // (C) Lock the manager role
@@ -124,14 +146,17 @@ contract DeployHamzaVault is Script {
             Baal.lockManager.selector
         );
 
-        // (D) Mint 100 loot tokens (50 to OWNER_ONE, 50 to the vault)
+        // (D) Mint loot tokens to Owner and to the Vault
+        uint256 userLootAmount  = stdJson.readUint(config, ".baal.userLootAmount");
+        uint256 vaultLootAmount = stdJson.readUint(config, ".baal.vaultLootAmount");
+
         address[] memory recipients = new address[](2);
-        recipients[0] = OWNER_ONE;
+        recipients[0] = OWNER_ONE;  
         recipients[1] = address(vault);
 
         uint256[] memory lootAmounts = new uint256[](2);
-        lootAmounts[0] = 50;
-        lootAmounts[1] = 50;
+        lootAmounts[0] = userLootAmount;
+        lootAmounts[1] = vaultLootAmount;
 
         bytes memory mintLootCall = abi.encodeWithSelector(
             Baal.mintLoot.selector,
@@ -139,71 +164,123 @@ contract DeployHamzaVault is Script {
             lootAmounts
         );
 
+        // Combine all Baal init actions
         bytes[] memory initActions = new bytes[](4);
         initActions[0] = mintSharesCall;
-        initActions[1] = unpauseLootCall;
+        initActions[1] = setAdminConfigCall;
         initActions[2] = lockManagerCall;
         initActions[3] = mintLootCall;
 
-        // 5) Summon Baal
+        // 8) Summon Baal
         address newBaalAddr = summoner.summonBaal(initParams, initActions, 9);
         console2.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
 
-        // fetch loot token address 
+        // fetch loot token address (Baal's "loot token")
         address lootTokenAddr = address(Baal(newBaalAddr).lootToken());
-
         hamzaToken = lootTokenAddr;
 
         console2.log("Loot token address:", lootTokenAddr);
 
-        // deploy governance token
+        // 9) Deploy governance token
+        //    read from config
+        string memory govTokenName   = stdJson.readString(config, ".governanceToken.name");
+        string memory govTokenSymbol = stdJson.readString(config, ".governanceToken.symbol");
+
         GovernanceToken govToken = new GovernanceToken(
             IERC20(lootTokenAddr),
-            "HamGov",
-            "HAM"
+            govTokenName,
+            govTokenSymbol
         );
-
         console2.log("GovernanceToken deployed at:", address(govToken));
 
-        // deploy governance vault
+        // 10) Deploy governance vault, reading vestingPeriod from config
+        uint256 vestingPeriod = stdJson.readUint(config, ".governanceVault.vestingPeriod");
+
         GovernanceVault govVault = new GovernanceVault(
             lootTokenAddr,
             GovernanceToken(address(govToken)),
-            30
+            vestingPeriod
         );
 
+        // link the community vault <-> governance vault
         CommunityVault(vault).setGovernanceVault(address(govVault), lootTokenAddr);
-
         govVault.setCommunityVault(address(vault));
 
         console2.log("GovernanceVault deployed at:", address(govVault));
 
-        address[] memory empty;
+        // 11) Deploy Timelock + Governor
+        //     read timelock delay from config
+        uint256 timelockDelay = stdJson.readUint(config, ".governor.timelockDelay");
 
-        TimelockController timelock = new TimelockController(1, empty, empty, OWNER_ONE);
+        address[] memory empty;
+        TimelockController timelock = new TimelockController(
+            timelockDelay,
+            empty,
+            empty,
+            OWNER_ONE
+        );
 
         HamzaGovernor governor = new HamzaGovernor(govToken, timelock);
 
-        SystemSettings systemSettings = new SystemSettings(IHatsSecurityContext(hatsSecurityContextAddr), safeAddr, 0);
+        console2.log("Governor deployed at:", address(governor));
+        governorAddr = payable(address(governor));
 
+        // 12) Deploy SystemSettings
+        // read feeBPS from config
+        uint256 feeBPS = stdJson.readUint(config, ".systemSettings.feeBPS");
+        SystemSettings systemSettings = new SystemSettings(
+            IHatsSecurityContext(hatsSecurityContextAddr),
+            safeAddr,
+            feeBPS
+        );
         systemSettingsAddr = address(systemSettings);
 
+        // 13) Grant roles in Timelock
         timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
         timelock.grantRole(0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1, address(governor));
 
-        console2.log("Governor deployed at:", address(governor));
+        // 14) grant timelock dao role to the governor
 
-        governorAddr = payable(address(governor));
+         {
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                daoHatId,
+                address(timelock)
+            );
+
+            SafeTransactionHelper.execTransaction(
+                safeAddr,
+                hats,
+                0,
+                data,
+                OWNER_ONE
+            );
+            console2.log("DAO hat minted to Timelock:", address(timelock));
+        }
+
+        // 15) Deploy PaymentEscrow 
+        PaymentEscrow paymentEscrow = new PaymentEscrow(
+            IHatsSecurityContext(hatsSecurityContextAddr),
+            ISystemSettings(address(systemSettings)),
+            autoRelease
+        );
+
+        // 16) Deploy EscrowMulticall
+        EscrowMulticall escrowMulticall = new EscrowMulticall();
+
+        console2.log("PaymentEscrow deployed at:", address(paymentEscrow));
+        console2.log("EscrowMulticall deployed at:", address(escrowMulticall));
 
         vm.stopBroadcast();
 
+        // Return addresses
         return (
-            newBaalAddr,        // hamzaBaal
-            payable(address(vault)),     // communityVault
-            address(govToken),  // governanceToken
-            address(govVault),  // governanceVault
-            safeAddr,           // safeAddress
-            hatsSecurityContextAddr // hatsSecurityContext
+            newBaalAddr,             // hamzaBaal
+            payable(address(vault)), // communityVault
+            address(govToken),       // governanceToken
+            address(govVault),       // governanceVault
+            safeAddr,                // safeAddress
+            hatsSecurityContextAddr  // hatsSecurityContext
         );
     }
 

@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Wrapper.sol";
-import "../security/HasSecurityContext.sol"; 
+import "@hamza-escrow/HasSecurityContext.sol"; 
 
 contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper {
     constructor(IERC20 wrappedToken, string memory name_, string memory symbol_) 
