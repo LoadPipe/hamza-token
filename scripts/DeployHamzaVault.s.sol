@@ -22,6 +22,9 @@ import "forge-std/StdJson.sol";
 import "forge-std/Script.sol";
 import { console2 } from "forge-std/console2.sol";
 
+import "../src/PurchaseTracker.sol";
+import "@hamza-escrow/IPurchaseTracker.sol";
+
 import { SafeTransactionHelper } from "./utils/SafeTransactionHelper.s.sol";
 
 /**
@@ -258,12 +261,21 @@ contract DeployHamzaVault is Script {
             console2.log("DAO hat minted to Timelock:", address(timelock));
         }
 
-        // 15) Deploy PaymentEscrow 
+        // 15) Deploy PurchaseTracker
+        PurchaseTracker purchaseTracker = new PurchaseTracker();
+        console2.log("PurchaseTracker deployed at:", address(purchaseTracker));
+
+
+        // 16) Deploy PaymentEscrow 
         PaymentEscrow paymentEscrow = new PaymentEscrow(
             IHatsSecurityContext(hatsSecurityContextAddr),
             ISystemSettings(address(systemSettings)),
-            autoRelease
+            autoRelease,
+            IPurchaseTracker(address(purchaseTracker))
         );
+
+        // authoruize the escrow 
+        purchaseTracker.authorizeEscrow(address(paymentEscrow));
 
         // 16) Deploy EscrowMulticall
         EscrowMulticall escrowMulticall = new EscrowMulticall();
