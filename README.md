@@ -19,10 +19,9 @@ The forking process ensures proper referencing of the Hats contract deployed on-
 ## Deployment
 
 ### Important Notes
-- Update the following variables in the scripts `HatsDeployment.s.sol` and `DeployHamzaVault.s.sol`:
-  - `OWNER_ONE`
-  - `OWNER_TWO`
-  - `adminAddress2`
+- Update ownerTwo in `config.json` to not be your address
+- Adjust any other params in `config.json` and they will update globally across deployments and tests 
+- If making a new test inherit the `DeploymentSetup.t.sol` to make it work form deployment 
 
 ### Deploying Contracts
 To deploy the contracts on the network, add the `--broadcast` flag to the script command:
@@ -34,7 +33,7 @@ forge script -vvv ./scripts/DeployHamzaVault.s.sol:DeployHamzaVault \
   --broadcast
 ```
 
-### Running the Script Without Deployment
+### Running the Script Without Live Deployment
 You can run the deployment script without actually deploying the contract using the following command:
 
 ```bash
@@ -53,4 +52,4 @@ forge script -vvv ./scripts/DeployHamzaVault.s.sol:DeployHamzaVault \
     --broadcast
    ```
 
-2. Add the deployed address from `DeployBaalSummoner` to `DeployHamzaVault.s.sol` by updating the `BALL_SUMMONER` variable.
+2. Add the deployed address from `DeployBaalSummoner` to `DeploymentSetup.t.sol` by updating the `BALL_SUMMONER` variable.

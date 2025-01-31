@@ -1,0 +1,28 @@
+{
+    "owners": {
+        "ownerTwo": "0x1542612fee591eD35C05A3E980bAB325265c06a3",
+        "_comment": "Swap ownerTwo to 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8"
+    },
+    "baal": {
+        "sharesName": "Hamza Shares",
+        "sharesSymbol": "HS",
+        "pauseSharesOnInit": true,
+        "pauseLootOnInit": false,
+        "safeSharesToMint": 1,
+        "userLootAmount": 50,
+        "vaultLootAmount": 50
+    },
+    "governanceToken": {
+        "name": "HamGov",
+        "symbol": "HAM"
+    },
+    "governanceVault": {
+        "vestingPeriod": 30
+    },
+    "governor": {
+        "timelockDelay": 1
+    },
+    "systemSettings": {
+        "feeBPS": 0
+    }
+}
