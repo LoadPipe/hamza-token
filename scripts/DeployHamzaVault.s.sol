@@ -50,6 +50,10 @@ contract DeployHamzaVault is Script {
 
     address public systemSettingsAddr;
 
+    address public purchaseTrackerAddr;
+
+    address public escrowAddr;
+
     function run()
         external
         returns (
@@ -265,6 +269,7 @@ contract DeployHamzaVault is Script {
         PurchaseTracker purchaseTracker = new PurchaseTracker();
         console2.log("PurchaseTracker deployed at:", address(purchaseTracker));
 
+        purchaseTrackerAddr = address(purchaseTracker);
 
         // 16) Deploy PaymentEscrow 
         PaymentEscrow paymentEscrow = new PaymentEscrow(
@@ -273,6 +278,8 @@ contract DeployHamzaVault is Script {
             autoRelease,
             IPurchaseTracker(address(purchaseTracker))
         );
+
+        escrowAddr = address(paymentEscrow);
 
         // authoruize the escrow 
         purchaseTracker.authorizeEscrow(address(paymentEscrow));

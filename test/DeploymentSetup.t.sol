@@ -19,6 +19,8 @@ contract DeploymentSetup is Test {
     address public hatsCtx;
     address payable public governor;
     address public systemSettings;
+    address public purchaseTracker;
+    address public escrow;
     uint256 public adminHatId;
     address public admin;
     address public lootToken;
@@ -27,6 +29,7 @@ contract DeploymentSetup is Test {
     uint256 public vestingPeriodFromConfig;
     uint256 public initialFeeBps;
     uint256 public timeLockDelay;
+    bool public autoRelease;
 
     enum ProposalState {
         Pending,
@@ -47,6 +50,7 @@ contract DeploymentSetup is Test {
         vestingPeriodFromConfig = config.readUint(".governanceVault.vestingPeriod");
         initialFeeBps = config.readUint(".systemSettings.feeBPS");
         timeLockDelay = config.readUint(".governor.timelockDelay");
+        autoRelease = config.readBool(".escrow.autoRelease");
 
         // Deploy contracts
         script = new DeployHamzaVault();
@@ -59,6 +63,8 @@ contract DeploymentSetup is Test {
         lootToken = script.hamzaToken();
         governor = script.governorAddr();
         systemSettings = script.systemSettingsAddr();
+        purchaseTracker = script.purchaseTrackerAddr();
+        escrow = script.escrowAddr();
     }
 
     // Shared Helper Functions

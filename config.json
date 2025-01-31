@@ -23,7 +23,7 @@
         "timelockDelay": 1
     },
     "systemSettings": {
-        "feeBPS": 0
+        "feeBPS": 100
     },
     "escrow": {
         "autoRelease": true
