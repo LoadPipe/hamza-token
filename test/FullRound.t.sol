@@ -7,7 +7,7 @@ import "../src/CommunityVault.sol";
 import "../src/GovernanceVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/HamzaGovernor.sol";
-import "../src/settings/SystemSettings.sol";
+import "@hamza-escrow/SystemSettings.sol";
 
 import "./DeploymentSetup.t.sol";
 

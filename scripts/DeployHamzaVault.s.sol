@@ -9,7 +9,10 @@ import "@baal/BaalSummoner.sol";
 import "../src/CommunityVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/GovernanceVault.sol";
-import "../src/settings/SystemSettings.sol";
+
+import "@hamza-escrow/SystemSettings.sol";
+import "@hamza-escrow/PaymentEscrow.sol";
+import "@hamza-escrow/EscrowMulticall.sol";
 
 import "../src/HamzaGovernor.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
@@ -18,6 +21,8 @@ import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "forge-std/StdJson.sol";
 import "forge-std/Script.sol";
 import { console2 } from "forge-std/console2.sol";
+
+import { SafeTransactionHelper } from "./utils/SafeTransactionHelper.s.sol";
 
 /**
  * @title DeployHamzaVault
@@ -101,6 +106,7 @@ contract DeployHamzaVault is Script {
         bool pauseSharesOnInit         = stdJson.readBool(config, ".baal.pauseSharesOnInit");
         bool pauseLootOnInit           = stdJson.readBool(config, ".baal.pauseLootOnInit");
         uint256 sharesToMintForSafe    = stdJson.readUint(config, ".baal.safeSharesToMint");
+        bool autoRelease               = stdJson.readBool(config, ".escrow.autoRelease");
 
         // pass these into the Baal initialization
         address _forwarder       = address(0);
@@ -232,6 +238,38 @@ contract DeployHamzaVault is Script {
         // 13) Grant roles in Timelock
         timelock.grantRole(keccak256("EXECUTOR_ROLE"), address(governor));
         timelock.grantRole(0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1, address(governor));
+
+        // 14) grant timelock dao role to the governor
+
+         {
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                daoHatId,
+                address(timelock)
+            );
+
+            SafeTransactionHelper.execTransaction(
+                safeAddr,
+                hats,
+                0,
+                data,
+                OWNER_ONE
+            );
+            console2.log("DAO hat minted to Timelock:", address(timelock));
+        }
+
+        // 15) Deploy PaymentEscrow 
+        PaymentEscrow paymentEscrow = new PaymentEscrow(
+            IHatsSecurityContext(hatsSecurityContextAddr),
+            ISystemSettings(address(systemSettings)),
+            autoRelease
+        );
+
+        // 16) Deploy EscrowMulticall
+        EscrowMulticall escrowMulticall = new EscrowMulticall();
+
+        console2.log("PaymentEscrow deployed at:", address(paymentEscrow));
+        console2.log("EscrowMulticall deployed at:", address(escrowMulticall));
 
         vm.stopBroadcast();
 

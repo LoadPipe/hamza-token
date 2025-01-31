@@ -22,3 +22,6 @@
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/vectorized/solady
+[submodule "lib/hamza-escrow"]
+	path = lib/hamza-escrow
+	url = https://github.com/LoadPipe/hamza-escrow
