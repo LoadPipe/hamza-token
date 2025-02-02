@@ -135,8 +135,10 @@ contract TestPaymentAndTracker is DeploymentSetup {
         vm.prank(payer);
         payEscrow.releaseEscrow(paymentId);
 
-        vm.prank(seller);
-        payEscrow.releaseEscrow(paymentId);
+        if (!autoRelease) {
+            vm.prank(seller);
+            payEscrow.releaseEscrow(paymentId);
+        }
 
         // Check final state
         EscrowLib.Payment memory storedPayment = payEscrow.getPayment(paymentId);
@@ -157,6 +159,104 @@ contract TestPaymentAndTracker is DeploymentSetup {
         assertEq(tracker.totalSalesCount(seller), 1, "Seller sales count mismatch");
         assertEq(tracker.totalSalesAmount(seller), netAmount, "Seller sales total mismatch");
     }
+
+    function testDistributeRewardsForBuyer() public {
+        bytes32 paymentId = keccak256("payment-reward-test-1");
+        uint256 payAmount = 500;
+
+        // Buyer makes a purchase
+        vm.startPrank(payer);
+        loot.approve(address(payEscrow), payAmount);
+
+        PaymentInput memory input = PaymentInput({
+            id: paymentId,
+            payer: payer,
+            receiver: seller,
+            currency: address(loot),
+            amount: payAmount
+        });
+        payEscrow.placePayment(input);
+        vm.stopPrank();
+
+        // Buyer and seller release escrow
+        vm.prank(payer);
+        payEscrow.releaseEscrow(paymentId);
+
+        if (!autoRelease) {
+            vm.prank(seller);
+            payEscrow.releaseEscrow(paymentId);
+        }
+
+        // Validate purchase tracking
+        assertEq(tracker.totalPurchaseCount(payer), 1, "Incorrect purchase count");
+        assertEq(tracker.totalSalesCount(seller), 1, "Incorrect sales count");
+
+        // Check initial reward balance
+        uint256 initialBuyerBalance = loot.balanceOf(payer);
+        uint256 rewardsToDistribute = tracker.totalPurchaseCount(payer);
+
+        // Distribute reward
+        vm.prank(payer);
+        tracker.distributeReward(payer);
+
+        // Verify rewards were distributed
+        assertEq(loot.balanceOf(payer), initialBuyerBalance + rewardsToDistribute, "Incorrect reward distribution");
+        assertEq(tracker.rewardsDistributed(payer), rewardsToDistribute, "Incorrect rewards tracked");
+    }
+
+    function testDistributeRewardsForSeller() public {
+        bytes32 paymentId = keccak256("payment-reward-test-2");
+        uint256 payAmount = 750;
+
+        // Buyer makes a purchase
+        vm.startPrank(payer);
+        loot.approve(address(payEscrow), payAmount);
+
+        PaymentInput memory input = PaymentInput({
+            id: paymentId,
+            payer: payer,
+            receiver: seller,
+            currency: address(loot),
+            amount: payAmount
+        });
+        payEscrow.placePayment(input);
+        vm.stopPrank();
+
+        // Buyer and seller release escrow
+        vm.prank(payer);
+        payEscrow.releaseEscrow(paymentId);
+
+        if (!autoRelease) {
+            vm.prank(seller);
+            payEscrow.releaseEscrow(paymentId);
+        }
+
+        // Validate purchase tracking
+        assertEq(tracker.totalSalesCount(seller), 1, "Incorrect sales count");
+
+        // Check initial reward balance
+        uint256 initialSellerBalance = loot.balanceOf(seller);
+        uint256 rewardsToDistribute = tracker.totalSalesCount(seller);
+
+        // Distribute reward
+        vm.prank(seller);
+        tracker.distributeReward(seller);
+
+        // Verify rewards were distributed
+        assertEq(loot.balanceOf(seller), initialSellerBalance + rewardsToDistribute, "Incorrect reward distribution");
+        assertEq(tracker.rewardsDistributed(seller), rewardsToDistribute, "Incorrect rewards tracked");
+    }
+
+    function testDistributeRewardsFailsIfNoPurchasesOrSales() public {
+        // Check initial reward distribution
+        assertEq(tracker.rewardsDistributed(arbiter), 0, "Arbiter should have no rewards");
+
+        // Expect revert due to no rewards available
+        vm.expectRevert("PurchaseTracker: No rewards to distribute");
+        vm.prank(arbiter);
+        tracker.distributeReward(arbiter);
+    }
+
 
     function payEscrowSettingsFee() internal view returns (uint256) {
         return systemSettings1.feeBps();
