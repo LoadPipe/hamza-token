@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 /**
  * @title PurchaseTracker
  * @notice A singleton contract that records purchase data.
  *
  */
 contract PurchaseTracker {
+    using SafeERC20 for IERC20;
     address public owner;
 
     // Mapping from buyer address to cumulative purchase count and total purchase amount.
@@ -16,9 +20,18 @@ contract PurchaseTracker {
     // mapping for sellers 
     mapping(address => uint256) public totalSalesCount;
     mapping(address => uint256) public totalSalesAmount;
+
+    // mapping rewards distributed
+    mapping(address => uint256) public rewardsDistributed;
     
     // Store details about each purchase (keyed by the unique payment ID).
     mapping(bytes32 => Purchase) public purchases;
+
+    //Comunity Vault address
+    address public communityVault;
+
+    // loot token 
+    IERC20 public lootToken;
     
     struct Purchase {
         address seller;
@@ -42,8 +55,10 @@ contract PurchaseTracker {
         _;
     }
     
-    constructor() {
+    constructor(address _communityVault, address _lootToken) {
         owner = msg.sender;
+        communityVault = _communityVault;
+        lootToken = IERC20(_lootToken);
     }
     
     /**
@@ -87,5 +102,22 @@ contract PurchaseTracker {
         emit PurchaseRecorded(paymentId, buyer, amount);
     }
     
-    // reward logic 
+    // distrubte reward from communtiy vault
+    function distributeReward(address recipient) external {
+        // for every purchase or sale made by the recipient, distribute 1 loot token
+        uint256 totalPurchase = totalPurchaseCount[recipient];
+        uint256 totalSales = totalSalesCount[recipient];
+        uint256 rewardsDist = rewardsDistributed[recipient];
+
+        uint256 totalRewards = totalPurchase + totalSales - rewardsDist;
+
+        require(totalRewards > 0, "PurchaseTracker: No rewards to distribute");
+
+        // transfer loot token from community vault to recipient
+        lootToken.safeTransferFrom(communityVault, recipient, totalRewards);
+
+        rewardsDistributed[recipient] += totalRewards;
+    }
+
+   
 }

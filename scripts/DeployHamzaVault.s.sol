@@ -266,8 +266,11 @@ contract DeployHamzaVault is Script {
         }
 
         // 15) Deploy PurchaseTracker
-        PurchaseTracker purchaseTracker = new PurchaseTracker();
+        PurchaseTracker purchaseTracker = new PurchaseTracker(address(vault), lootTokenAddr);
         console2.log("PurchaseTracker deployed at:", address(purchaseTracker));
+
+        //setPurchaseTracker in community vault
+        CommunityVault(vault).setPurchaseTracker(address(purchaseTracker), lootTokenAddr);
 
         purchaseTrackerAddr = address(purchaseTracker);
 
