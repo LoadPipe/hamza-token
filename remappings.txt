@@ -6,3 +6,4 @@
 @opengsn/=lib/gsn/packages/
 @hats-protocol/=lib/hats-protocol/src
 @forge-std/=lib/forge-std/src/
+@hamza-escrow/=lib/hamza-escrow/src

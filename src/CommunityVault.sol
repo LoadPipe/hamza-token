@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./security/HasSecurityContext.sol"; 
-import "./security/Roles.sol";
-import "./security/IHatsSecurityContext.sol";
+import "@hamza-escrow/HasSecurityContext.sol";
+import "@hamza-escrow/Roles.sol";
+import "@hamza-escrow/IHatsSecurityContext.sol";
 import "./GovernanceVault.sol";      
 
 /**
@@ -19,6 +19,9 @@ contract CommunityVault is HasSecurityContext {
 
     // Governance staking contract address
     address public governanceVault;
+
+    // Address for purchase tracker 
+    address public purchaseTracker;
 
     // Events
     event Deposit(address indexed token, address indexed from, uint256 amount);
@@ -122,9 +125,20 @@ contract CommunityVault is HasSecurityContext {
 
         governanceVault = vault;
 
-        // Best practice when changing allowances:
+        // Grant unlimited allowance to the governance vault
         IERC20(lootToken).safeApprove(vault, 0);
         IERC20(lootToken).safeApprove(vault, type(uint256).max);
+    }
+
+    function setPurchaseTracker(address _purchaseTracker, address lootToken) external {
+        require(_purchaseTracker != address(0), "Invalid purchase tracker address");
+        require(lootToken != address(0), "Invalid loot token address");
+        
+        purchaseTracker = _purchaseTracker;
+
+        // Grant unlimited allowance to the purchase tracker
+        IERC20(lootToken).safeApprove(_purchaseTracker, 0);
+        IERC20(lootToken).safeApprove(_purchaseTracker, type(uint256).max);
     }
 
     /**

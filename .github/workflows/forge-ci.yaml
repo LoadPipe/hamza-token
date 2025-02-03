@@ -22,10 +22,6 @@ jobs:
         with:
           version: stable
 
-      # Set up environment variables
-      - name: Set environment variables
-        run: echo "PRIVATE_KEY=${{ secrets.PRIVATE_KEY }}" >> $GITHUB_ENV
-
       # Run Foundry tests
       - name: Run Foundry Tests (Sepolia Fork)
         run: forge test -vvv --via-ir --optimizer-runs 1100 --fork-url https://sepolia.drpc.org

@@ -25,3 +25,7 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "lib/hamza-escrow"]
+	path = lib/hamza-escrow
+	url = https://github.com/LoadPipe/hamza-escrow
+	branch = HAMT-42-buyer-seller-rewards

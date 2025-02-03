@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 import { Script } from "forge-std/Script.sol";
-import { console2} from "forge-std/console2.sol";
-
+import { console2 } from "forge-std/console2.sol";
+import { stdJson } from "forge-std/StdJson.sol";
 import { SafeTransactionHelper } from "./utils/SafeTransactionHelper.s.sol";
 
 // Minimal interface to read the Gnosis Safe's nonce.
@@ -13,26 +13,24 @@ interface IGnosisSafe {
 
 // Hats Protocol
 import { Hats } from "@hats-protocol/Hats.sol";
-import { EligibilityModule } from "../src/security/hats/EligibilityModule.sol";
-import { ToggleModule } from "../src/security/hats/ToggleModule.sol";
-import { HatsSecurityContext } from "../src/security/HatsSecurityContext.sol";
-import { IHatsSecurityContext } from "../src/security/IHatsSecurityContext.sol";
-import { Roles } from "../src/security/Roles.sol";
+import { EligibilityModule } from "@hamza-escrow/hats/EligibilityModule.sol";
+import { ToggleModule } from "@hamza-escrow/hats/ToggleModule.sol";
+import { HatsSecurityContext } from "@hamza-escrow/HatsSecurityContext.sol";
+import { IHatsSecurityContext } from "@hamza-escrow/IHatsSecurityContext.sol";
+import { Roles } from "@hamza-escrow/Roles.sol";
 
 import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
 
 /**
  * @title HatsDeployment
- * @notice Script to deploy the Hats protocol contracts and safe
+ * @notice Script to deploy the Hats protocol contracts and a Gnosis Safe.
  */
 contract HatsDeployment is Script {
-
     // Gnosis Safe singleton & factory on Sepolia
     address constant SAFE_SINGLETON = 0x69f4D1788e39c87893C980c06EdF4b7f686e2938;
-    address constant SAFE_FACTORY  = 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC;
+    address constant SAFE_FACTORY   = 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC;
 
-    // The second owner (besides adminAddress1 which is automatically the sender)
-    address public adminAddress2 = 0x1542612fee591eD35C05A3E980bAB325265c06a3; // hudson's address: 0x1310cEdD03Cc8F6aE50F2Fb93848070FACB042b8
+    address public adminAddress2;
 
     // The newly deployed Safe
     address public deployedSafe;
@@ -54,39 +52,64 @@ contract HatsDeployment is Script {
     uint256 internal deployerPk;
     address internal adminAddress1;
 
-    function execTransaction(address to, address target, uint256 value, bytes memory data) internal {
+    /**
+     * @dev Helper to execute transactions on the newly deployed safe.
+     */
+    function execTransaction(
+        address to,
+        address target,
+        uint256 value,
+        bytes memory data
+    ) internal {
         SafeTransactionHelper.execTransaction(to, target, value, data, adminAddress1);
     }
 
     /**
-     * @notice Runs the deployment. Returns the newly deployed safe address
+     * @notice Runs the deployment. Returns the newly deployed safe address and other hats data.
      */
+    function run()
+        external
+        returns (
+            address safeAddress,
+            address hatsAddress,
+            address eligibilityModuleAddress,
+            address toggleModuleAddress,
+            address securityContextAddress,
+            uint256 _adminHatId,
+            uint256 _arbiterHatId,
+            uint256 _daoHatId,
+            uint256 _systemHatId,
+            uint256 _pauserHatId
+        )
+    {
 
-    function run() external returns (
-        address safeAddress,
-        address hatsAddress,
-        address eligibilityModuleAddress,
-        address toggleModuleAddress,
-        address securityContextAddress,
-        uint256 adminHat,
-        uint256 arbiterHat,
-        uint256 daoHat,
-        uint256 systemHat,
-        uint256 pauserHat
-    ) {
-        // 1) load deployer private key
-        deployerPk = vm.envUint("PRIVATE_KEY");
-        adminAddress1 = vm.addr(deployerPk);
+        // 1) read config
+        string memory config = vm.readFile("./config.json");
+        adminAddress2 = stdJson.readAddress(config, ".owners.ownerTwo"); 
+        
+        // read mode from config
+        string memory mode = stdJson.readString(config, ".mode");
+
+        if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
+            // 2) load deployer private key
+            deployerPk = vm.envUint("PRIVATE_KEY");
+            adminAddress1 = vm.addr(deployerPk);
+        }
+        else {
+            // 2) admin not from deployer private key
+            deployerPk = uint256(0x123456789abcdef);
+            adminAddress1 = vm.addr(deployerPk);
+        }
+
         vm.startBroadcast(deployerPk);
 
-        console2.log("Deployer EOA (adminAddress1):", adminAddress1);
-        console2.log("Starting Hats deployment with v=1 (approved hash) signatures...");
 
-        // 2) Use existing Hats or deploy a new instance
+        // 3) Use existing Hats or deploy a new instance
+        //    If you want to deploy a fresh Hats contract, uncomment the second line:
         hats = Hats(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137);
         // hats = new Hats("Hats Protocol v1", "ipfs://...");
 
-        // 3) Deploy a new Gnosis Safe (1-of-2 owners)
+        // 4) Deploy a new Gnosis Safe (1-of-2 owners)
         GnosisSafeProxyFactory factory = GnosisSafeProxyFactory(SAFE_FACTORY);
         address[] memory owners = new address[](2);
         owners[0] = adminAddress1;
@@ -105,18 +128,13 @@ contract HatsDeployment is Script {
         );
 
         address safeAddr = address(factory.createProxy(SAFE_SINGLETON, setupData));
-        console2.log("Gnosis Safe deployed at:", safeAddr);
-        
         deployedSafe = safeAddr;
 
-        // 4) Deploy Eligibility & Toggle modules
+        // 5) Deploy Eligibility & Toggle modules
         eligibilityModule = new EligibilityModule(safeAddr);
         toggleModule      = new ToggleModule(safeAddr);
 
-        console2.log("EligibilityModule at:", address(eligibilityModule));
-        console2.log("ToggleModule at:     ", address(toggleModule));
-
-        // 5) Mint Top Hat to the Safe (via the Safe)
+        // 6) Mint Top Hat to the Safe (via the Safe)
         {
             bytes memory data = abi.encodeWithSelector(
                 Hats.mintTopHat.selector,
@@ -127,9 +145,8 @@ contract HatsDeployment is Script {
             execTransaction(safeAddr, address(hats), 0, data);
         }
         adminHatId = uint256(hats.lastTopHatId()) << 224;
-        console2.log("adminHatId (TopHat) =", adminHatId);
 
-        // 6) Create child Hats
+        // 7) Create child Hats
 
         // Arbiter
         {
@@ -146,7 +163,7 @@ contract HatsDeployment is Script {
             );
             execTransaction(safeAddr, address(hats), 0, data);
         }
-            
+        
         // DAO
         {
             daoHatId = hats.getNextId(adminHatId);
@@ -194,18 +211,13 @@ contract HatsDeployment is Script {
             );
             execTransaction(safeAddr, address(hats), 0, data);
         }
-        console2.log("Arbiter Hat ID:", arbiterHatId);
-        console2.log("DAO Hat ID:    ", daoHatId);
-        console2.log("System Hat ID: ", systemHatId);
-        console2.log("Pauser Hat ID: ", pauserHatId);
 
-        // 7) Deploy HatsSecurityContext & set role hats
+        // 8) Deploy HatsSecurityContext & set role hats
         securityContext = new HatsSecurityContext(address(hats), adminHatId);
-        console2.log("HatsSecurityContext at:", address(securityContext));
 
-        // 8) Configure eligibility + toggle modules
+        // 9) Configure eligibility + toggle modules
         {
-            // Hat rules
+            // Configure each hat's rules in the eligibility module
             bytes memory data = abi.encodeWithSelector(
                 EligibilityModule.setHatRules.selector,
                 adminHatId,
@@ -247,7 +259,7 @@ contract HatsDeployment is Script {
             execTransaction(safeAddr, address(eligibilityModule), 0, data);
         }
         {
-            // Toggle hat "active"
+            // Toggle hats "active" in the toggle module
             bytes memory data = abi.encodeWithSelector(
                 ToggleModule.setHatStatus.selector,
                 adminHatId,
@@ -284,9 +296,9 @@ contract HatsDeployment is Script {
             execTransaction(safeAddr, address(toggleModule), 0, data);
         }
 
-        // 9) Mint hats to relevant addresses
+        // 10) Mint hats to relevant addresses
+        // Arbiter
         {
-            // Arbiter
             bytes memory data = abi.encodeWithSelector(
                 Hats.mintHat.selector,
                 arbiterHatId,
@@ -301,24 +313,17 @@ contract HatsDeployment is Script {
             );
             execTransaction(safeAddr, address(hats), 0, data);
         }
+        // DAO
         {
-            // DAO
             bytes memory data = abi.encodeWithSelector(
                 Hats.mintHat.selector,
                 daoHatId,
                 adminAddress1
             );
             execTransaction(safeAddr, address(hats), 0, data);
-
-            data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                daoHatId,
-                adminAddress2
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
         }
+        // System
         {
-            // System
             bytes memory data = abi.encodeWithSelector(
                 Hats.mintHat.selector,
                 systemHatId,
@@ -333,8 +338,8 @@ contract HatsDeployment is Script {
             );
             execTransaction(safeAddr, address(hats), 0, data);
         }
+        // Pauser
         {
-            // Pauser
             bytes memory data = abi.encodeWithSelector(
                 Hats.mintHat.selector,
                 pauserHatId,
@@ -350,7 +355,7 @@ contract HatsDeployment is Script {
             execTransaction(safeAddr, address(hats), 0, data);
         }
 
-        // 10) Set role hats in the HatsSecurityContext
+        // 11) Set role hats in the HatsSecurityContext
         {
             bytes memory data = abi.encodeWithSelector(
                 HatsSecurityContext.setRoleHat.selector,
@@ -383,14 +388,23 @@ contract HatsDeployment is Script {
 
         vm.stopBroadcast();
 
-        console2.log("-----------------------------------------------");
-        console2.log("Hats deployed at:             ", address(hats));
-        console2.log("EligibilityModule deployed at:", address(eligibilityModule));
-        console2.log("ToggleModule deployed at:     ", address(toggleModule));
-        console2.log("HatsSecurityContext deployed: ", address(securityContext));
-        console2.log("Gnosis Safe deployed at:      ", deployedSafe);
-        console2.log("Finished Hats deployment script");
-        console2.log("-----------------------------------------------");
+        if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
+
+            console2.log("-----------------------------------------------");
+            console2.log("Admin Hat ID:", adminHatId);
+            console2.log("Arbiter Hat ID:", arbiterHatId);
+            console2.log("DAO Hat ID:    ", daoHatId);
+            console2.log("System Hat ID: ", systemHatId);
+            console2.log("Pauser Hat ID: ", pauserHatId);
+
+            console2.log("-----------------------------------------------");
+            console2.log("Hats Address is:             ", address(hats));
+            console2.log("EligibilityModule deployed at:", address(eligibilityModule));
+            console2.log("ToggleModule deployed at:     ", address(toggleModule));
+            console2.log("HatsSecurityContext deployed: ", address(securityContext));
+            console2.log("Gnosis Safe deployed at:      ", deployedSafe);
+            console2.log("-----------------------------------------------");
+        }
 
         // Return all relevant addresses and hat IDs
         return (
