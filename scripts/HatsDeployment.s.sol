@@ -82,13 +82,24 @@ contract HatsDeployment is Script {
             uint256 _pauserHatId
         )
     {
-        // 1) load deployer private key
-        deployerPk = vm.envUint("PRIVATE_KEY");
-        adminAddress1 = vm.addr(deployerPk);
 
-        // 2) read config
+        // 1) read config
         string memory config = vm.readFile("./config.json");
         adminAddress2 = stdJson.readAddress(config, ".owners.ownerTwo"); 
+        
+        // read mode from config
+        string memory mode = stdJson.readString(config, ".mode");
+
+        if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
+            // 2) load deployer private key
+            deployerPk = vm.envUint("PRIVATE_KEY");
+            adminAddress1 = vm.addr(deployerPk);
+        }
+        else {
+            // 2) admin not from deployer private key
+            deployerPk = uint256(0x123456789abcdef);
+            adminAddress1 = vm.addr(deployerPk);
+        }
 
         vm.startBroadcast(deployerPk);
 
@@ -377,20 +388,23 @@ contract HatsDeployment is Script {
 
         vm.stopBroadcast();
 
-        console2.log("-----------------------------------------------");
-        console2.log("Admin Hat ID:", adminHatId);
-        console2.log("Arbiter Hat ID:", arbiterHatId);
-        console2.log("DAO Hat ID:    ", daoHatId);
-        console2.log("System Hat ID: ", systemHatId);
-        console2.log("Pauser Hat ID: ", pauserHatId);
+        if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
 
-        console2.log("-----------------------------------------------");
-        console2.log("Hats Address is:             ", address(hats));
-        console2.log("EligibilityModule deployed at:", address(eligibilityModule));
-        console2.log("ToggleModule deployed at:     ", address(toggleModule));
-        console2.log("HatsSecurityContext deployed: ", address(securityContext));
-        console2.log("Gnosis Safe deployed at:      ", deployedSafe);
-        console2.log("-----------------------------------------------");
+            console2.log("-----------------------------------------------");
+            console2.log("Admin Hat ID:", adminHatId);
+            console2.log("Arbiter Hat ID:", arbiterHatId);
+            console2.log("DAO Hat ID:    ", daoHatId);
+            console2.log("System Hat ID: ", systemHatId);
+            console2.log("Pauser Hat ID: ", pauserHatId);
+
+            console2.log("-----------------------------------------------");
+            console2.log("Hats Address is:             ", address(hats));
+            console2.log("EligibilityModule deployed at:", address(eligibilityModule));
+            console2.log("ToggleModule deployed at:     ", address(toggleModule));
+            console2.log("HatsSecurityContext deployed: ", address(securityContext));
+            console2.log("Gnosis Safe deployed at:      ", deployedSafe);
+            console2.log("-----------------------------------------------");
+        }
 
         // Return all relevant addresses and hat IDs
         return (

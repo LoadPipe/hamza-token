@@ -68,9 +68,20 @@ contract DeployHamzaVault is Script {
         // 1) Read config file
         string memory config = vm.readFile("./config.json");
 
+        // read mode from config
+        string memory mode = stdJson.readString(config, ".mode");
+
         // 2) Set up owners
-        deployerPk = vm.envUint("PRIVATE_KEY");
-        OWNER_ONE = vm.addr(deployerPk);
+        if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
+            // 2) load deployer private key
+            deployerPk = vm.envUint("PRIVATE_KEY");
+            OWNER_ONE = vm.addr(deployerPk);
+        }
+        else {
+            // 2) admin not from deployer private key
+            deployerPk = uint256(0x123456789abcdef);
+            OWNER_ONE = vm.addr(deployerPk);
+        }
 
         // Read the second owner from config
         OWNER_TWO = stdJson.readAddress(config, ".owners.ownerTwo");
@@ -276,9 +287,6 @@ contract DeployHamzaVault is Script {
         EscrowMulticall escrowMulticall = new EscrowMulticall();
 
         vm.stopBroadcast();
-
-        // read mode from config
-        string memory mode = stdJson.readString(config, ".mode");
 
         if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
             console2.log("Owner One (from PRIVATE_KEY):", OWNER_ONE);
