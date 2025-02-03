@@ -75,9 +75,6 @@ contract DeployHamzaVault is Script {
         // Read the second owner from config
         OWNER_TWO = stdJson.readAddress(config, ".owners.ownerTwo");
 
-        console2.log("Owner One (from PRIVATE_KEY):", OWNER_ONE);
-        console2.log("Owner Two (from config):     ", OWNER_TWO);
-
         // 3) Deploy all hats + new Gnosis Safe
         HatsDeployment hatsDeployment = new HatsDeployment();
         (
@@ -94,18 +91,15 @@ contract DeployHamzaVault is Script {
         ) = hatsDeployment.run();
 
         adminHatId = _adminHatId;
-        console2.log("Using Safe from HatsDeployment at:", safeAddr);
 
         // 4) Start broadcast for subsequent deployments
         vm.startBroadcast(deployerPk);
 
         // 5) Deploy the Community Vault
         CommunityVault vault = new CommunityVault(hatsSecurityContextAddr);
-        console2.log("CommunityVault deployed at:", address(vault));
 
         // 6) Summon the Baal DAO
         BaalSummoner summoner = BaalSummoner(BAAL_SUMMONER);
-        console2.log("BaalSummoner at:", address(summoner));
 
         // read BAAL parameters from config
         string memory sharesName       = stdJson.readString(config, ".baal.sharesName");
@@ -180,13 +174,10 @@ contract DeployHamzaVault is Script {
 
         // 8) Summon Baal
         address newBaalAddr = summoner.summonBaal(initParams, initActions, 9);
-        console2.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
 
         // fetch loot token address (Baal's "loot token")
         address lootTokenAddr = address(Baal(newBaalAddr).lootToken());
         hamzaToken = lootTokenAddr;
-
-        console2.log("Loot token address:", lootTokenAddr);
 
         // 9) Deploy governance token
         //    read from config
@@ -198,7 +189,6 @@ contract DeployHamzaVault is Script {
             govTokenName,
             govTokenSymbol
         );
-        console2.log("GovernanceToken deployed at:", address(govToken));
 
         // 10) Deploy governance vault, reading vestingPeriod from config
         uint256 vestingPeriod = stdJson.readUint(config, ".governanceVault.vestingPeriod");
@@ -212,8 +202,6 @@ contract DeployHamzaVault is Script {
         // link the community vault <-> governance vault
         CommunityVault(vault).setGovernanceVault(address(govVault), lootTokenAddr);
         govVault.setCommunityVault(address(vault));
-
-        console2.log("GovernanceVault deployed at:", address(govVault));
 
         // 11) Deploy Timelock + Governor
         //     read timelock delay from config
@@ -229,7 +217,6 @@ contract DeployHamzaVault is Script {
 
         HamzaGovernor governor = new HamzaGovernor(govToken, timelock);
 
-        console2.log("Governor deployed at:", address(governor));
         governorAddr = payable(address(governor));
 
         // 12) Deploy SystemSettings
@@ -262,12 +249,10 @@ contract DeployHamzaVault is Script {
                 data,
                 OWNER_ONE
             );
-            console2.log("DAO hat minted to Timelock:", address(timelock));
         }
 
         // 15) Deploy PurchaseTracker
         PurchaseTracker purchaseTracker = new PurchaseTracker(address(vault), lootTokenAddr);
-        console2.log("PurchaseTracker deployed at:", address(purchaseTracker));
 
         //setPurchaseTracker in community vault
         CommunityVault(vault).setPurchaseTracker(address(purchaseTracker), lootTokenAddr);
@@ -290,10 +275,33 @@ contract DeployHamzaVault is Script {
         // 16) Deploy EscrowMulticall
         EscrowMulticall escrowMulticall = new EscrowMulticall();
 
-        console2.log("PaymentEscrow deployed at:", address(paymentEscrow));
-        console2.log("EscrowMulticall deployed at:", address(escrowMulticall));
-
         vm.stopBroadcast();
+
+        // read mode from config
+        string memory mode = stdJson.readString(config, ".mode");
+
+        if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
+            console2.log("Owner One (from PRIVATE_KEY):", OWNER_ONE);
+            console2.log("Owner Two (from config):     ", OWNER_TWO);
+
+            console2.log("CommunityVault deployed at:", address(vault));
+
+            console2.log("BaalSummoner at:", address(summoner));
+            console2.log("Baal (Hamza Vault) deployed at:", newBaalAddr);
+
+            console2.log("Loot token address:", lootTokenAddr);
+
+            console2.log("GovernanceToken deployed at:", address(govToken));
+            console2.log("GovernanceVault deployed at:", address(govVault));
+            console2.log("Governor deployed at:", address(governor));
+
+            console2.log("Timelock deployed at:", address(timelock));
+            console2.log("PurchaseTracker deployed at:", address(purchaseTracker));
+            console2.log("PaymentEscrow deployed at:", address(paymentEscrow));
+            console2.log("EscrowMulticall deployed at:", address(escrowMulticall));
+            console2.log("-----------------------------------------------");
+
+        }
 
         // Return addresses
         return (
