@@ -82,19 +82,27 @@ contract HatsDeployment is Script {
             uint256 _pauserHatId
         )
     {
-        // 1) load deployer private key
-        deployerPk = vm.envUint("PRIVATE_KEY");
-        adminAddress1 = vm.addr(deployerPk);
 
-        // 2) read config
+        // 1) read config
         string memory config = vm.readFile("./config.json");
         adminAddress2 = stdJson.readAddress(config, ".owners.ownerTwo"); 
-        console2.log("Admin address #2 from config:", adminAddress2);
+        
+        // read mode from config
+        string memory mode = stdJson.readString(config, ".mode");
+
+        if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
+            // 2) load deployer private key
+            deployerPk = vm.envUint("PRIVATE_KEY");
+            adminAddress1 = vm.addr(deployerPk);
+        }
+        else {
+            // 2) admin not from deployer private key
+            deployerPk = uint256(0x123456789abcdef);
+            adminAddress1 = vm.addr(deployerPk);
+        }
 
         vm.startBroadcast(deployerPk);
 
-        console2.log("Deployer EOA (adminAddress1):", adminAddress1);
-        console2.log("Starting Hats deployment with v=1 (approved hash) signatures...");
 
         // 3) Use existing Hats or deploy a new instance
         //    If you want to deploy a fresh Hats contract, uncomment the second line:
@@ -120,15 +128,11 @@ contract HatsDeployment is Script {
         );
 
         address safeAddr = address(factory.createProxy(SAFE_SINGLETON, setupData));
-        console2.log("Gnosis Safe deployed at:", safeAddr);
         deployedSafe = safeAddr;
 
         // 5) Deploy Eligibility & Toggle modules
         eligibilityModule = new EligibilityModule(safeAddr);
         toggleModule      = new ToggleModule(safeAddr);
-
-        console2.log("EligibilityModule at:", address(eligibilityModule));
-        console2.log("ToggleModule at:     ", address(toggleModule));
 
         // 6) Mint Top Hat to the Safe (via the Safe)
         {
@@ -141,7 +145,6 @@ contract HatsDeployment is Script {
             execTransaction(safeAddr, address(hats), 0, data);
         }
         adminHatId = uint256(hats.lastTopHatId()) << 224;
-        console2.log("adminHatId (TopHat) =", adminHatId);
 
         // 7) Create child Hats
 
@@ -208,14 +211,9 @@ contract HatsDeployment is Script {
             );
             execTransaction(safeAddr, address(hats), 0, data);
         }
-        console2.log("Arbiter Hat ID:", arbiterHatId);
-        console2.log("DAO Hat ID:    ", daoHatId);
-        console2.log("System Hat ID: ", systemHatId);
-        console2.log("Pauser Hat ID: ", pauserHatId);
 
         // 8) Deploy HatsSecurityContext & set role hats
         securityContext = new HatsSecurityContext(address(hats), adminHatId);
-        console2.log("HatsSecurityContext at:", address(securityContext));
 
         // 9) Configure eligibility + toggle modules
         {
@@ -390,14 +388,23 @@ contract HatsDeployment is Script {
 
         vm.stopBroadcast();
 
-        console2.log("-----------------------------------------------");
-        console2.log("Hats deployed at:             ", address(hats));
-        console2.log("EligibilityModule deployed at:", address(eligibilityModule));
-        console2.log("ToggleModule deployed at:     ", address(toggleModule));
-        console2.log("HatsSecurityContext deployed: ", address(securityContext));
-        console2.log("Gnosis Safe deployed at:      ", deployedSafe);
-        console2.log("Finished Hats deployment script");
-        console2.log("-----------------------------------------------");
+        if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
+
+            console2.log("-----------------------------------------------");
+            console2.log("Admin Hat ID:", adminHatId);
+            console2.log("Arbiter Hat ID:", arbiterHatId);
+            console2.log("DAO Hat ID:    ", daoHatId);
+            console2.log("System Hat ID: ", systemHatId);
+            console2.log("Pauser Hat ID: ", pauserHatId);
+
+            console2.log("-----------------------------------------------");
+            console2.log("Hats Address is:             ", address(hats));
+            console2.log("EligibilityModule deployed at:", address(eligibilityModule));
+            console2.log("ToggleModule deployed at:     ", address(toggleModule));
+            console2.log("HatsSecurityContext deployed: ", address(securityContext));
+            console2.log("Gnosis Safe deployed at:      ", deployedSafe);
+            console2.log("-----------------------------------------------");
+        }
 
         // Return all relevant addresses and hat IDs
         return (
