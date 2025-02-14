@@ -12,7 +12,7 @@ To run tests using Foundry, execute the following command:
 forge test --fork-url sepolia -vvv
 ```
 
-The forking process ensures proper referencing of the Hats contract deployed on-chain.
+The forking ensures proper referencing of the Hats contract deployed on-chain.
 
 ---
 
@@ -53,3 +53,44 @@ forge script -vvv ./scripts/DeployHamzaVault.s.sol:DeployHamzaVault \
    ```
 
 2. Add the deployed address from `DeployBaalSummoner` to `DeploymentSetup.t.sol` by updating the `BALL_SUMMONER` variable.
+
+## Configuration (`config.json`)
+The `config.json` file contains key settings for deployment and testing. Below is an explnation of each param:
+
+- **mode**: Determines the deployment environment.
+  - `Test`: Used for testing.
+  - `Deploy`: Used for live deployments with logging enabled.
+
+- **owners**:
+  - `ownerTwo`: The secondary owner address.
+
+- **baal**:
+  - `sharesName`: Name of the governance share tokens.
+  - `sharesSymbol`: Symbol for the governance shares.
+  - `pauseSharesOnInit`: Whether to pause share transfers at the beginning.
+  - `pauseLootOnInit`: Whether to pause loot (non-voting) token transfers initially.
+  - `safeSharesToMint`: Initial governance shares allocated to the safe.
+  - `userLootAmount`: Number of loot tokens deploying user receives.
+  - `vaultLootAmount`: Number of loot tokens allocated to the vault.
+
+- **governanceToken**:
+  - `name`: Name of the governance token.
+  - `symbol`: Symbol for the governance token.
+
+- **governanceVault**:
+  - `vestingPeriod`: Time (in days) for governance token vesting.
+
+- **governor**:
+  - `timelockDelay`: Delay (in blocks or time) before execution of governance proposals.
+
+- **systemSettings**:
+  - `feeBPS`: Fee basis points (0 means no fee).
+
+- **escrow**:
+  - `autoRelease`: Whether the escrow automatically releases funds upon conditions being met.
+
+The `config.json` file is used to ensure consistent deployment settings across tests and live deployments. Adjust these parameters before running any scripts.
+
+---
+
+
