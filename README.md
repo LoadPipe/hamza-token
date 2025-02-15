@@ -52,10 +52,10 @@ forge script -vvv ./scripts/DeployHamzaVault.s.sol:DeployHamzaVault \
     --broadcast
    ```
 
-2. Add the deployed address from `DeployBaalSummoner` to `DeploymentSetup.t.sol` by updating the `BALL_SUMMONER` variable.
+2. Add the deployed address from `DeployBaalSummoner` to `DeploymentSetup.t.sol` by updating the `BAAL_SUMMONER` variable.
 
 ## Configuration (`config.json`)
-The `config.json` file contains key settings for deployment and testing. Below is an explnation of each param:
+The `config.json` file contains key settings for deployment and testing. Below is an explanation of each parameter:
 
 - **mode**: Determines the deployment environment.
   - `Test`: Used for testing.
@@ -72,6 +72,12 @@ The `config.json` file contains key settings for deployment and testing. Below i
   - `safeSharesToMint`: Initial governance shares allocated to the safe.
   - `userLootAmount`: Number of loot tokens deploying user receives.
   - `vaultLootAmount`: Number of loot tokens allocated to the vault.
+  - `votingPeriod`: Duration (in seconds) for voting on proposals.
+  - `gracePeriod`: Time (in seconds) after voting ends before execution.
+  - `proposalOffering`: Required ETH amount for non-members to submit proposals.
+  - `sponsorThreshold`: Minimum number of shares required to sponsor a proposal.
+  - `minRetentionPercent`: Minimum percentage of shares required to prevent mass exits before execution.
+  - `quorumPercent`: Minimum percentage of total shares required to vote "yes" for a proposal to pass.
 
 - **governanceToken**:
   - `name`: Name of the governance token.
@@ -92,5 +98,4 @@ The `config.json` file contains key settings for deployment and testing. Below i
 The `config.json` file is used to ensure consistent deployment settings across tests and live deployments. Adjust these parameters before running any scripts.
 
 ---
-
 
