@@ -1,5 +1,5 @@
 {
-    "mode": "Test",
+    "mode": "Deploy",
     "_comment": "Swap mode to Deploy for deployment. adds back in logs",
     "owners": {
         "ownerTwo": "0x1542612fee591eD35C05A3E980bAB325265c06a3",
@@ -12,7 +12,13 @@
         "pauseLootOnInit": false,
         "safeSharesToMint": 1,
         "userLootAmount": 50,
-        "vaultLootAmount": 50
+        "vaultLootAmount": 50,
+        "votingPeriod": 90,
+        "gracePeriod": 0,
+        "proposalOffering": 0,
+        "sponsorThreshold": 1,
+        "minRetentionPercent": 1,
+        "quorumPercent": 1
     },
     "governanceToken": {
         "name": "HamGov",

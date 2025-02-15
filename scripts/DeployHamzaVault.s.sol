@@ -176,15 +176,29 @@ contract DeployHamzaVault is Script {
             lootAmounts
         );
 
+        // (E) Set Governance Configuration
+        uint32 votingPeriod = uint32(stdJson.readUint(config, ".baal.votingPeriod"));
+        uint32 gracePeriod = uint32(stdJson.readUint(config, ".baal.gracePeriod"));
+        uint256 proposalOffering = stdJson.readUint(config, ".baal.proposalOffering");
+        uint256 quorumPercent = stdJson.readUint(config, ".baal.quorumPercent");
+        uint256 sponsorThreshold = stdJson.readUint(config, ".baal.sponsorThreshold");
+        uint256 minRetentionPercent = stdJson.readUint(config, ".baal.minRetentionPercent");
+
+        bytes memory setGovernanceConfigCall = abi.encodeWithSelector(
+            Baal.setGovernanceConfig.selector,
+            abi.encode(votingPeriod, gracePeriod, proposalOffering, quorumPercent, sponsorThreshold, minRetentionPercent)
+        );
+        
         // Combine all Baal init actions
-        bytes[] memory initActions = new bytes[](4);
+        bytes[] memory initActions = new bytes[](5);
         initActions[0] = mintSharesCall;
         initActions[1] = setAdminConfigCall;
         initActions[2] = lockManagerCall;
         initActions[3] = mintLootCall;
+        initActions[4] = setGovernanceConfigCall;
 
         // 8) Summon Baal
-        address newBaalAddr = summoner.summonBaal(initParams, initActions, 9);
+        address newBaalAddr = summoner.summonBaal(initParams, initActions, uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty))) % 100);
 
         // fetch loot token address (Baal's "loot token")
         address lootTokenAddr = address(Baal(newBaalAddr).lootToken());
