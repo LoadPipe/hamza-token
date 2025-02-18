@@ -167,8 +167,8 @@ contract DeployHamzaVault is Script {
         recipients[1] = address(vault);
 
         uint256[] memory lootAmounts = new uint256[](2);
-        lootAmounts[0] = userLootAmount;
-        lootAmounts[1] = vaultLootAmount;
+        lootAmounts[0] = userLootAmount * 10 ** 18;
+        lootAmounts[1] = vaultLootAmount* 10 ** 18;
 
         bytes memory mintLootCall = abi.encodeWithSelector(
             Baal.mintLoot.selector,
