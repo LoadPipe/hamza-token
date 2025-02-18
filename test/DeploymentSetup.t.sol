@@ -46,7 +46,7 @@ contract DeploymentSetup is Test {
     function setUp() public virtual {
         // Load config
         string memory config = vm.readFile("./config.json");
-        userLootAmountFromConfig = config.readUint(".baal.userLootAmount");
+        userLootAmountFromConfig = config.readUint(".baal.userLootAmount")*10**18;
         vestingPeriodFromConfig = config.readUint(".governanceVault.vestingPeriod");
         initialFeeBps = config.readUint(".systemSettings.feeBPS");
         timeLockDelay = config.readUint(".governor.timelockDelay");
