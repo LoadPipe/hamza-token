@@ -12,7 +12,13 @@
         "pauseLootOnInit": false,
         "safeSharesToMint": 1,
         "userLootAmount": 50,
-        "vaultLootAmount": 50
+        "vaultLootAmount": 50,
+        "votingPeriod": 90,
+        "gracePeriod": 0,
+        "proposalOffering": 0,
+        "sponsorThreshold": 1,
+        "minRetentionPercent": 1,
+        "quorumPercent": 1
     },
     "governanceToken": {
         "name": "HamGov",
