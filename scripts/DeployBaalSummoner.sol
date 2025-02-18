@@ -23,8 +23,11 @@ contract DeployCustomBaalSummoner is Script {
     address constant LOOT_SINGLETON           = 0x00768B047f73D88b6e9c14bcA97221d6E179d468;
     address constant SHARES_SINGLETON         = 0x52acf023d38A31f7e7bC92cCe5E68d36cC9752d6;
 
+     uint256 internal deployerPk;
+
     function run() external {
-        vm.startBroadcast();
+        deployerPk = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPk);
 
         // 1) Deploy a fresh BaalSummoner
         BaalSummoner summoner = new BaalSummoner();
