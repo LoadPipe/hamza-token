@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import "forge-std/Script.sol";
 
-import "@baal/BaalSummoner.sol";
+import "../src/CustomBaalSummoner.sol";
 import "../src/CustomBaal.sol";
 import "../src/CommunityVault.sol";
 
@@ -30,7 +30,7 @@ contract DeployCustomBaalSummoner is Script {
         vm.startBroadcast(deployerPk);
 
         // 1) Deploy a fresh BaalSummoner
-        BaalSummoner summoner = new BaalSummoner();
+        CustomBaalSummoner summoner = new CustomBaalSummoner();
         summoner.initialize(); // set up ownership, UUPS, etc.
         console.log("BaalSummoner deployed at:", address(summoner));
 
