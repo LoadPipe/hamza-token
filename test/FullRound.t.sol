@@ -7,6 +7,7 @@ import "../src/CommunityVault.sol";
 import "../src/GovernanceVault.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/HamzaGovernor.sol";
+import "../src/CustomBaal.sol";
 import "@hamza-escrow/SystemSettings.sol";
 
 import "./DeploymentSetup.t.sol";
@@ -42,6 +43,15 @@ contract FullRound is DeploymentSetup {
             actualFeeBps,
             initialFeeBps,
             "System feeBps does not match config's initial feeBps"
+        );
+
+        // Ensure Baal correctly records the CommunityVault address
+        CustomBaal baalContract = CustomBaal(baal);
+        address recordedCommunityVault = baalContract.communityVault();
+        assertEq(
+            recordedCommunityVault,
+            communityVault,
+            "Baal's recorded CommunityVault does not match the deployed address"
         );
     }
 

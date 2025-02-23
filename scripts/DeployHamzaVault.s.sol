@@ -35,7 +35,7 @@ import { SafeTransactionHelper } from "./utils/SafeTransactionHelper.s.sol";
  */
 contract DeployHamzaVault is Script {
     // (A) Deployed BaalSummoner on Sepolia
-    address constant BAAL_SUMMONER = 0x33267E2d3decebCae26FA8D837Ef3F7608367ab2; 
+    address constant BAAL_SUMMONER = 0x72DdD6F967ecb17f6f8eCaebd8B6FdA6Cc91Cff0; 
 
     // Key addresses & params
     address public OWNER_ONE;
