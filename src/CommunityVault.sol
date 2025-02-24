@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@hamza-escrow/HasSecurityContext.sol";
-import "@hamza-escrow/Roles.sol";
-import "@hamza-escrow/IHatsSecurityContext.sol";
+import "@hamza-escrow/security/HasSecurityContext.sol";
+import "@hamza-escrow/security/Roles.sol";
+import "@hamza-escrow/security/ISecurityContext.sol";
 import "./GovernanceVault.sol";      
 
 /**
@@ -35,7 +35,7 @@ contract CommunityVault is HasSecurityContext {
      */
     constructor(address _securityContext) {
         if (address(_securityContext) == address(0)) revert ZeroAddressArgument();
-        _setSecurityContext(IHatsSecurityContext(_securityContext));
+        _setSecurityContext(ISecurityContext(_securityContext));
     }
 
     /**

@@ -248,7 +248,7 @@ contract DeployHamzaVault is Script {
         // read feeBPS from config
         uint256 feeBPS = stdJson.readUint(config, ".systemSettings.feeBPS");
         SystemSettings systemSettings = new SystemSettings(
-            IHatsSecurityContext(hatsSecurityContextAddr),
+            ISecurityContext(hatsSecurityContextAddr),
             safeAddr,
             feeBPS
         );
@@ -286,7 +286,7 @@ contract DeployHamzaVault is Script {
 
         // 16) Deploy PaymentEscrow 
         PaymentEscrow paymentEscrow = new PaymentEscrow(
-            IHatsSecurityContext(hatsSecurityContextAddr),
+            ISecurityContext(hatsSecurityContextAddr),
             ISystemSettings(address(systemSettings)),
             autoRelease,
             IPurchaseTracker(address(purchaseTracker))

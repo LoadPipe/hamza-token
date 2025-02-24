@@ -15,9 +15,9 @@ interface IGnosisSafe {
 import { Hats } from "@hats-protocol/Hats.sol";
 import { EligibilityModule } from "@hamza-escrow/hats/EligibilityModule.sol";
 import { ToggleModule } from "@hamza-escrow/hats/ToggleModule.sol";
-import { HatsSecurityContext } from "@hamza-escrow/HatsSecurityContext.sol";
-import { IHatsSecurityContext } from "@hamza-escrow/IHatsSecurityContext.sol";
-import { Roles } from "@hamza-escrow/Roles.sol";
+import { HatsSecurityContext } from "@hamza-escrow/security/HatsSecurityContext.sol";
+import { ISecurityContext } from "@hamza-escrow/security/ISecurityContext.sol";
+import { Roles } from "@hamza-escrow/security/Roles.sol";
 
 import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
 
