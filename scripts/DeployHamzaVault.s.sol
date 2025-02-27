@@ -316,13 +316,13 @@ contract DeployHamzaVault is Script {
             console2.log("GovernanceToken deployed at:", address(govToken));
             console2.log("GovernanceVault deployed at:", address(govVault));
             console2.log("Governor deployed at:", address(governor));
+            console2.log("SystemSettings deployed at:", address(systemSettings));
 
             console2.log("Timelock deployed at:", address(timelock));
             console2.log("PurchaseTracker deployed at:", address(purchaseTracker));
             console2.log("PaymentEscrow deployed at:", address(paymentEscrow));
             console2.log("EscrowMulticall deployed at:", address(escrowMulticall));
             console2.log("-----------------------------------------------");
-
         }
 
         // Return addresses
