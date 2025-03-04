@@ -155,6 +155,20 @@ contract RagequitTest is DeploymentSetup {
         uint256 initialTotalSupply = baalContract.totalSupply();
         console2.log("Initial total supply (shares + loot):", initialTotalSupply);
         
+        // Get community vault's loot balance
+        uint256 vaultLootBalance = IERC20(lootToken).balanceOf(communityVault);
+        console2.log("Community vault LOOT balance:", vaultLootBalance);
+        
+        // Get community vault's shares balance (if any)
+        uint256 vaultSharesBalance = IERC20(address(baalContract.sharesToken())).balanceOf(communityVault);
+        console2.log("Community vault SHARES balance:", vaultSharesBalance);
+        
+        // Calculate adjusted total supply by subtracting vault's tokens
+        uint256 adjustedTotalSupply = initialTotalSupply > (vaultLootBalance + vaultSharesBalance)
+            ? initialTotalSupply - (vaultLootBalance + vaultSharesBalance)
+            : 1; // Avoid division by zero
+        console2.log("Adjusted total supply:", adjustedTotalSupply);
+        
         // Send 8 ETH to the Baal avatar
         vm.deal(address(this), 10 ether);
         (bool success, ) = payable(baalContract.avatar()).call{value: 8 ether}("");
@@ -174,11 +188,12 @@ contract RagequitTest is DeploymentSetup {
         uint256 initialUserEthBalance = user.balance;
         console2.log("User's initial ETH balance:", initialUserEthBalance);
         
-        // Calculate expected ETH return based on CustomBaal's _ragequit implementation:
-        // It subtracts the community vault balance from the DAO's balance before calculating
-        uint256 adjustedBalance = avatarEthBalance; // This is the DAO balance
-        // The vault balance isn't counted for ETH calculation
-        uint256 expectedEthReturn = (lootToBurn * adjustedBalance) / initialTotalSupply;
+        // Calculate expected ETH return based on the updated CustomBaal formula
+        // Step 1: Exclude community vault ETH balance from DAO balance
+        uint256 adjustedEthBalance = avatarEthBalance;
+        
+        // Step 2: Calculate expected ETH return using the adjusted total supply as denominator
+        uint256 expectedEthReturn = (lootToBurn * adjustedEthBalance) / adjustedTotalSupply;
         console2.log("Expected ETH return:", expectedEthReturn);
         
         // Execute ragequit as the user

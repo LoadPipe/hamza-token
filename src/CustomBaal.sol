@@ -647,6 +647,17 @@ contract CustomBaal is Module, EIP712Upgradeable, ReentrancyGuardUpgradeable, Ba
         address[] memory tokens
     ) internal {
         uint256 _totalSupply = totalSupply();
+        
+        // Calculate the actual total supply that should be used for calculations
+        // by subtracting the community vault's loot and shares (if any)
+        uint256 adjustedTotalSupply = _totalSupply;
+        if (communityVault != address(0)) {
+            uint256 vaultLootBalance = lootToken.balanceOf(communityVault);
+            uint256 vaultSharesBalance = sharesToken.balanceOf(communityVault);
+            adjustedTotalSupply = _totalSupply > (vaultLootBalance + vaultSharesBalance) 
+                ? _totalSupply - (vaultLootBalance + vaultSharesBalance)
+                : 1; // Avoid division by zero
+        }
 
         if (lootToBurn != 0) {
             /*gas optimization*/
@@ -658,7 +669,7 @@ contract CustomBaal is Module, EIP712Upgradeable, ReentrancyGuardUpgradeable, Ba
             _burnShares(_msgSender(), sharesToBurn); /*subtract `shares` from user account & Baal totals with erc20 accounting*/
         }
 
-        /* NEW RAGEQUIT LOGIC: Exclude Community Vault from the DAO's token balance. */
+        /* NEW RAGEQUIT LOGIC: Exclude Community Vault from both the DAO's token balance AND the total supply. */
         for (uint256 i = 0; i < tokens.length; i++) {
             uint256 daoBalance;
             if (tokens[i] == ETH) {
@@ -687,8 +698,9 @@ contract CustomBaal is Module, EIP712Upgradeable, ReentrancyGuardUpgradeable, Ba
                 ? (daoBalance - vaultBalance)
                 : 0;
 
+            // Use the adjustedTotalSupply as denominator instead of _totalSupply
             uint256 amountToRagequit = ((lootToBurn + sharesToBurn) * adjustedBalance) /
-                _totalSupply; /*calculate 'fair shair' claims*/
+                adjustedTotalSupply; /*calculate 'fair share' claims*/
 
             if (amountToRagequit != 0) {
                 /*gas optimization to allow higher maximum token limit*/
