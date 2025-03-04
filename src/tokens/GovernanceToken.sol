@@ -25,21 +25,11 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper {
     }
     
     function depositFor(address account, uint256 amount) public override(ERC20Wrapper) returns (bool) /* onlyRole(MINTER_ROLE) */ {
-        SafeERC20.safeTransferFrom(underlying, account, address(this), amount);
-        _mint(account, amount);
-        return true;
-    }
-
-    function depositForGov(address account, uint256 amount) public returns (bool) /* onlyRole(MINTER_ROLE) */ {
-        SafeERC20.safeTransferFrom(underlying, msg.sender, address(this), amount);
-        _mint(account, amount);
-        return true;
+        return super.depositFor(account, amount);
     }
 
     function withdrawTo(address account, uint256 amount) public override(ERC20Wrapper) returns (bool) /* onlyRole(MINTER_ROLE) */ {
-        _burn(account, amount);
-        SafeERC20.safeTransfer(underlying, account, amount);
-        return true;
+        return super.withdrawTo(account, amount);
     }
 
     function _mint(address to, uint256 amount) internal override(ERC20, ERC20Votes) {
