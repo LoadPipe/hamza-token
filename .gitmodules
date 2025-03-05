@@ -28,4 +28,3 @@
 [submodule "lib/hamza-escrow"]
 	path = lib/hamza-escrow
 	url = https://github.com/LoadPipe/hamza-escrow
-	branch = HAMT-37-security-context-refactor
