@@ -681,25 +681,8 @@ contract CustomBaal is Module, EIP712Upgradeable, ReentrancyGuardUpgradeable, Ba
                 daoBalance = abi.decode(balanceData, (uint256));
             }
 
-            // Subtract the portion that is in the communityVault (if any)
-            uint256 vaultBalance;
-            if (communityVault != address(0)) {
-                if (tokens[i] == ETH) {
-                    vaultBalance = address(communityVault).balance;
-                } else {
-                    (, bytes memory cData) = tokens[i].staticcall(
-                        abi.encodeWithSelector(0x70a08231, communityVault)
-                    );
-                    vaultBalance = abi.decode(cData, (uint256));
-                }
-            }
-
-            uint256 adjustedBalance = daoBalance > vaultBalance
-                ? (daoBalance - vaultBalance)
-                : 0;
-
             // Use the adjustedTotalSupply as denominator instead of _totalSupply
-            uint256 amountToRagequit = ((lootToBurn + sharesToBurn) * adjustedBalance) /
+            uint256 amountToRagequit = ((lootToBurn + sharesToBurn) * daoBalance) /
                 adjustedTotalSupply; /*calculate 'fair share' claims*/
 
             if (amountToRagequit != 0) {

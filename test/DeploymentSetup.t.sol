@@ -26,6 +26,7 @@ contract DeploymentSetup is Test {
     address public lootToken;
     address public user;
     uint256 public userLootAmountFromConfig;
+    uint256 public vaultLootAmountFromConfig;
     uint256 public vestingPeriodFromConfig;
     uint256 public initialFeeBps;
     uint256 public timeLockDelay;
@@ -47,6 +48,7 @@ contract DeploymentSetup is Test {
         // Load config
         string memory config = vm.readFile("./config.json");
         userLootAmountFromConfig = config.readUint(".baal.userLootAmount")*10**18;
+        vaultLootAmountFromConfig = config.readUint(".baal.vaultLootAmount")*10**18;
         vestingPeriodFromConfig = config.readUint(".governanceVault.vestingPeriod");
         initialFeeBps = config.readUint(".systemSettings.feeBPS");
         timeLockDelay = config.readUint(".governor.timelockDelay");
