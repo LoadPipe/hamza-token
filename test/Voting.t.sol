@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import "@hamza-escrow/HatsSecurityContext.sol";
+import "@hamza-escrow/security/HatsSecurityContext.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/HamzaGovernor.sol";
 import "../src/utils/TestToken.sol";

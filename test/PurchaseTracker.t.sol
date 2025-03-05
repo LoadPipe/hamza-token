@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "./DeploymentSetup.t.sol";
 import "../src/PurchaseTracker.sol";
 import "@hamza-escrow/PaymentEscrow.sol" as EscrowLib;
-import "@hamza-escrow/Roles.sol";
+import "@hamza-escrow/security/Roles.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@hamza-escrow/ISystemSettings.sol";
 
