@@ -67,7 +67,7 @@ contract PurchaseTracker is HasSecurityContext {
      * @notice Authorizes an escrow (or other) contract to record purchases.
      * @param escrow The address of the escrow contract.
      */
-    function authorizeEscrow(address escrow) external onlyOwner {
+    function authorizeEscrow(address escrow) external onlyRole(Roles.SYSTEM_ROLE) {
         authorizedEscrows[escrow] = true;
     }
     
@@ -75,7 +75,7 @@ contract PurchaseTracker is HasSecurityContext {
      * @notice Removes authorization for an escrow contract.
      * @param escrow The address to deauthorize.
      */
-    function deauthorizeEscrow(address escrow) external onlyOwner {
+    function deauthorizeEscrow(address escrow) external onlyRole(Roles.SYSTEM_ROLE) {
         authorizedEscrows[escrow] = false;
     }
     
