@@ -119,7 +119,11 @@ contract DeployHamzaVault is Script {
         (address newBaalAddr, address payable vault, address lootTokenAddr) = deployBaalAndCommunityVault();
         
         // 9-10) Deploy governance token and vault
-        (address govTokenAddr, address govVaultAddr) = deployGovernanceContracts(lootTokenAddr, vault);
+        (address govTokenAddr, address govVaultAddr) = deployGovernanceContracts(
+            ISecurityContext(hatsSecurityContextAddr), 
+            lootTokenAddr, 
+            vault
+        );
         
         // 11-14) Deploy Timelock and Governor
         address timelockAddr = deployGovernorAndTimelock(govTokenAddr);
@@ -305,6 +309,7 @@ contract DeployHamzaVault is Script {
     }
     
     function deployGovernanceContracts(
+        ISecurityContext securityContext,
         address lootTokenAddr,
         address payable vault
     ) internal returns (
@@ -316,6 +321,7 @@ contract DeployHamzaVault is Script {
         string memory govTokenSymbol = config.readString(".governanceToken.symbol");
 
         GovernanceToken govToken = new GovernanceToken(
+            securityContext, 
             IERC20(lootTokenAddr),
             govTokenName,
             govTokenSymbol
