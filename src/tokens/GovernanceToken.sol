@@ -18,19 +18,19 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper, HasSec
         return 18;
     }
 
-    function mint(address to, uint256 amount) external /* onlyRole(MINTER_ROLE) */ {
+    function mint(address to, uint256 amount) external onlyRole(Roles.MINTER_ROLE) {
         _mint(to, amount);
     }
 
-    function burn(address account, uint256 amount) external /* onlyRole(BURNER_ROLE) */ {
+    function burn(address account, uint256 amount) external onlyRole(Roles.BURNER_ROLE) {
         _burn(account, amount);
     }
     
-    function depositFor(address account, uint256 amount) public override(ERC20Wrapper) returns (bool) /* onlyRole(MINTER_ROLE) */ {
+    function depositFor(address account, uint256 amount) public override(ERC20Wrapper) onlyRole(Roles.MINTER_ROLE) returns (bool) {
         return super.depositFor(account, amount);
     }
 
-    function withdrawTo(address account, uint256 amount) public override(ERC20Wrapper) returns (bool) /* onlyRole(MINTER_ROLE) */ {
+    function withdrawTo(address account, uint256 amount) public override(ERC20Wrapper) onlyRole(Roles.MINTER_ROLE) returns (bool) {
         return super.withdrawTo(account, amount);
     }
 

@@ -65,14 +65,6 @@ contract VotingTest is Test {
             lootToken.mint(voters[n], 100);
         }
 
-        //wrap tokens for voters
-        for(uint8 n=0; n<voters.length; n++) {
-            vm.startPrank(voters[n]);
-            lootToken.approve(address(govToken), 100);
-            govToken.depositFor(voters[n], 100);
-            vm.stopPrank();
-        }
-
         vm.startPrank(admin);
         
         // deploy main contracts
@@ -87,9 +79,7 @@ contract VotingTest is Test {
         // 1) Grab the Hats protocol reference & adminHatId from our security context
         Hats hats = Hats(securityContext.hats()); 
 
-        // 2) Create a new child-hat under that adminHatId (if it doesn't already exist)
-        //    In real deployments, you'd call createHat via Gnosis Safe that holds the top-hat,
-        //    but here we assume your `admin` can create it for testing.
+        // 2) Create new child-hats as needed for tests
         uint256 daoHatId = hats.getNextId(adminHatId);
         hats.createHat(
             adminHatId,
@@ -100,17 +90,40 @@ contract VotingTest is Test {
             true,       // mutable
             ""          // details
         );
+        uint256 minterHatId = hats.getNextId(adminHatId);
+        hats.createHat(
+            adminHatId,
+            "Minter Hat",   // optional name
+            uint32(voters.length),      // maxSupply
+            address(1), // eligibility module (none in this simple test)
+            address(1), // toggle module (none in this simple test)
+            true,       // mutable
+            ""          // details
+        );
 
-        // 3) Tell the security context that "DAO_ROLE" = our newly created daoHatId
+        // 3) Assign roles to hats
         securityContext.setRoleHat(Roles.DAO_ROLE, daoHatId);
+        securityContext.setRoleHat(Roles.MINTER_ROLE, minterHatId);
 
-        // 4) Mint the DAO hat to the Timelock
+        // 4) Mint the hats
         hats.mintHat(daoHatId, address(timelock));
+        for(uint8 n=0; n<voters.length; n++) {
+            hats.mintHat(minterHatId, voters[n]);
+        }
 
         //prepare proposal data
         targets.push(address(systemSettings));
         values.push(uint256(0));
         calldatas.push(abi.encodeWithSignature("setFeeBps(uint256)", 1));
+
+        vm.stopPrank();
+
+        for(uint8 n=0; n<voters.length; n++) {
+            vm.startPrank(voters[n]);
+            lootToken.approve(address(govToken), 100);
+            govToken.depositFor(voters[n], 100);
+            vm.stopPrank();
+        }
     }
 
     function createHatsSecurityContext() internal returns (HatsSecurityContext) {
