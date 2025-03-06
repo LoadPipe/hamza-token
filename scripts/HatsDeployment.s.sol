@@ -48,6 +48,7 @@ contract HatsDeployment is Script {
     uint256 public systemHatId;
     uint256 public pauserHatId;
     uint256 public minterHatId;
+    uint256 public burnerHatId;
 
     // Deployer's private key and derived addresses
     uint256 internal deployerPk;
@@ -81,7 +82,8 @@ contract HatsDeployment is Script {
             uint256 _daoHatId,
             uint256 _systemHatId,
             uint256 _pauserHatId,
-            uint256 _minterHatId
+            uint256 _minterHatId, 
+            uint256 _burnerHatId
         )
     {
 
@@ -154,6 +156,7 @@ contract HatsDeployment is Script {
         systemHatId = createHat("ipfs://bafkreie2vxohaw7cneknlwv6hq7h4askkv6jfcadho6efz5bxfx66fqu3q", 2);
         pauserHatId = createHat("ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw4", 2);
         minterHatId = createHat("ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw1", 100);
+        burnerHatId = createHat("ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw2", 100);
 
         // 8) Deploy HatsSecurityContext & set role hats
         securityContext = new HatsSecurityContext(address(hats), adminHatId);
@@ -165,6 +168,7 @@ contract HatsDeployment is Script {
         setHatRules(systemHatId, true, true);
         setHatRules(pauserHatId, true, true);
         setHatRules(minterHatId, true, true);
+        setHatRules(burnerHatId, true, true);
         
         setHatStatus(adminHatId, true);
         setHatStatus(arbiterHatId, true);
@@ -172,6 +176,7 @@ contract HatsDeployment is Script {
         setHatStatus(systemHatId, true);
         setHatStatus(pauserHatId, true);
         setHatStatus(minterHatId, true);
+        setHatStatus(burnerHatId, true);
 
         // 10) Mint hats to relevant addresses
         //Arbiter
@@ -193,12 +198,17 @@ contract HatsDeployment is Script {
         mintHat(minterHatId, adminAddress1);
         mintHat(minterHatId, adminAddress2);
 
+        //Burner 
+        mintHat(burnerHatId, adminAddress1);
+        mintHat(burnerHatId, adminAddress2);
+
         // 11) Set role hats in the HatsSecurityContext
         setHatRole(arbiterHatId, Roles.ARBITER_ROLE);
         setHatRole(daoHatId, Roles.DAO_ROLE);
         setHatRole(systemHatId, Roles.SYSTEM_ROLE);
         setHatRole(pauserHatId, Roles.PAUSER_ROLE);
         setHatRole(minterHatId, Roles.MINTER_ROLE);
+        setHatRole(burnerHatId, Roles.BURNER_ROLE);
 
         vm.stopBroadcast();
 
@@ -211,6 +221,7 @@ contract HatsDeployment is Script {
             console2.log("System Hat ID: ", systemHatId);
             console2.log("Pauser Hat ID: ", pauserHatId);
             console2.log("Minter Hat ID: ", minterHatId);
+            console2.log("Burner Hat ID: ", burnerHatId);
 
             console2.log("-----------------------------------------------");
             console2.log("Hats Address is:             ", address(hats));
@@ -233,7 +244,8 @@ contract HatsDeployment is Script {
             daoHatId,
             systemHatId,
             pauserHatId,
-            minterHatId
+            minterHatId,
+            burnerHatId
         );
     }
 

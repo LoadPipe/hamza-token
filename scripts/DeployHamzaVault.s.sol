@@ -63,6 +63,7 @@ contract DeployHamzaVault is Script {
     address public hatsSecurityContextAddr;
     uint256 public daoHatId;
     uint256 public minterHatId;
+    uint256 public burnerHatId;
     string public config;
 
     function run()
@@ -104,6 +105,7 @@ contract DeployHamzaVault is Script {
             uint256 _adminHatId,
             uint256 _daoHatId,
             uint256 _minterHatId,
+            uint256 _burnerHatId,
             address _hatsSecurityContextAddr
         ) = deployHats();
         
@@ -113,6 +115,7 @@ contract DeployHamzaVault is Script {
         adminHatId = _adminHatId;
         daoHatId = _daoHatId;
         minterHatId = _minterHatId;
+        burnerHatId = _burnerHatId;
         hatsSecurityContextAddr = _hatsSecurityContextAddr;
 
         // 4) Start broadcast for subsequent deployments
@@ -163,6 +166,7 @@ contract DeployHamzaVault is Script {
         uint256 _adminHatId,
         uint256 _daoHatId,
         uint256 _minterHatId,
+        uint256 _burnerHatId,
         address _hatsSecurityContextAddr
     ) {
         HatsDeployment hatsDeployment = new HatsDeployment();
@@ -184,7 +188,8 @@ contract DeployHamzaVault is Script {
             _daoHatId,
             systemHatId,
             pauserHatId,
-            _minterHatId
+            _minterHatId,
+            _burnerHatId
         ) = hatsDeployment.run();
         
         return (
@@ -193,6 +198,7 @@ contract DeployHamzaVault is Script {
             _adminHatId,
             _daoHatId,
             _minterHatId,
+            _burnerHatId,
             _hatsSecurityContextAddr
         );
     }
@@ -350,22 +356,9 @@ contract DeployHamzaVault is Script {
         CommunityVault(vault).setGovernanceVault(govVaultAddr, lootTokenAddr);
         govVault.setCommunityVault(vault);
 
-        //Assign minter hat to the governance vault
-        {
-            bytes memory data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                minterHatId,
-                govVaultAddr
-            );
-
-            SafeTransactionHelper.execTransaction(
-                safeAddr,
-                hats,
-                0,
-                data,
-                OWNER_ONE
-            );
-        }
+        //Assign minter & burner hats to the governance vault
+        assignHat(minterHatId, govVaultAddr);
+        assignHat(burnerHatId, govVaultAddr);
         
         return (govTokenAddr, govVaultAddr);
     }
@@ -405,21 +398,7 @@ contract DeployHamzaVault is Script {
         timelock.grantRole(0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1, address(governor));
 
         // 14) grant timelock dao role to the governor
-        {
-            bytes memory data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                daoHatId,
-                address(timelock)
-            );
-
-            SafeTransactionHelper.execTransaction(
-                safeAddr,
-                hats,
-                0,
-                data,
-                OWNER_ONE
-            );
-        }
+        assignHat(daoHatId, address(timelock));
         
         return timelockAddr;
     }
@@ -494,5 +473,22 @@ contract DeployHamzaVault is Script {
         uint256[] memory arr = new uint256[](1);
         arr[0] = _val;
         return arr;
+    }
+
+    function assignHat(uint256 hatId, address recipient) private 
+    {
+        bytes memory data = abi.encodeWithSelector(
+            Hats.mintHat.selector,
+            hatId,
+            recipient
+        );
+
+        SafeTransactionHelper.execTransaction(
+            safeAddr,
+            hats,
+            0,
+            data,
+            OWNER_ONE
+        );
     }
 }
