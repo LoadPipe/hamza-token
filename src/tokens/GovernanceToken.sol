@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Wrapper.sol";
 import "@hamza-escrow/security/HasSecurityContext.sol"; 
 
 contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper, HasSecurityContext {
-    constructor(ISecurityContext _securityContext, IERC20 wrappedToken, string memory name_, string memory symbol_) 
+    constructor(ISecurityContext _securityContext, IERC20 wrappedToken, string memory /*name_*/, string memory /*symbol_*/) 
         ERC20("HamGov", "HAM") ERC20Permit("HamGov") ERC20Wrapper(wrappedToken) {
             _setSecurityContext(_securityContext);
         }

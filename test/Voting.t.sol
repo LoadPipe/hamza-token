@@ -53,9 +53,12 @@ contract VotingTest is Test {
         voters.push(address(0x20));
         voters.push(address(0x21));
 
+        //security context
+        securityContext = createHatsSecurityContext();
+
         //create tokens & mint
         lootToken = new TestToken("LOOT", "LOOT");
-        govToken = new GovernanceToken(lootToken, "Hamg", "HAMG");
+        govToken = new GovernanceToken(securityContext, lootToken, "Hamg", "HAMG");
 
         //mint tokens 
         for(uint256 n=0; n<voters.length; n++) {
@@ -73,7 +76,6 @@ contract VotingTest is Test {
         vm.startPrank(admin);
         
         // deploy main contracts
-        securityContext = createHatsSecurityContext();
         timelock = new TimelockController(1, empty, empty, admin);
         governor = new HamzaGovernor(govToken, timelock);
         systemSettings = new SystemSettings(securityContext, admin, 0);

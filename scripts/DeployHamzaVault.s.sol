@@ -62,6 +62,7 @@ contract DeployHamzaVault is Script {
     address public hats;
     address public hatsSecurityContextAddr;
     uint256 public daoHatId;
+    uint256 public minterHatId;
     string public config;
 
     function run()
@@ -102,6 +103,7 @@ contract DeployHamzaVault is Script {
             address _hats,
             uint256 _adminHatId,
             uint256 _daoHatId,
+            uint256 _minterHatId,
             address _hatsSecurityContextAddr
         ) = deployHats();
         
@@ -110,6 +112,7 @@ contract DeployHamzaVault is Script {
         hats = _hats;
         adminHatId = _adminHatId;
         daoHatId = _daoHatId;
+        minterHatId = _minterHatId;
         hatsSecurityContextAddr = _hatsSecurityContextAddr;
 
         // 4) Start broadcast for subsequent deployments
@@ -159,6 +162,7 @@ contract DeployHamzaVault is Script {
         address _hats,
         uint256 _adminHatId,
         uint256 _daoHatId,
+        uint256 _minterHatId,
         address _hatsSecurityContextAddr
     ) {
         HatsDeployment hatsDeployment = new HatsDeployment();
@@ -179,7 +183,8 @@ contract DeployHamzaVault is Script {
             arbiterHatId,
             _daoHatId,
             systemHatId,
-            pauserHatId
+            pauserHatId,
+            _minterHatId
         ) = hatsDeployment.run();
         
         return (
@@ -187,6 +192,7 @@ contract DeployHamzaVault is Script {
             _hats,
             _adminHatId,
             _daoHatId,
+            _minterHatId,
             _hatsSecurityContextAddr
         );
     }
@@ -341,8 +347,25 @@ contract DeployHamzaVault is Script {
         govVaultAddr = address(govVault);
 
         // link the community vault <-> governance vault
-        CommunityVault(vault).setGovernanceVault(address(govVault), lootTokenAddr);
+        CommunityVault(vault).setGovernanceVault(govVaultAddr, lootTokenAddr);
         govVault.setCommunityVault(vault);
+
+        //Assign minter hat to the governance vault
+        {
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                minterHatId,
+                govVaultAddr
+            );
+
+            SafeTransactionHelper.execTransaction(
+                safeAddr,
+                hats,
+                0,
+                data,
+                OWNER_ONE
+            );
+        }
         
         return (govTokenAddr, govVaultAddr);
     }

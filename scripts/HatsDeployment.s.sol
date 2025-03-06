@@ -47,6 +47,7 @@ contract HatsDeployment is Script {
     uint256 public topHatId;
     uint256 public systemHatId;
     uint256 public pauserHatId;
+    uint256 public minterHatId;
 
     // Deployer's private key and derived addresses
     uint256 internal deployerPk;
@@ -79,7 +80,8 @@ contract HatsDeployment is Script {
             uint256 _arbiterHatId,
             uint256 _daoHatId,
             uint256 _systemHatId,
-            uint256 _pauserHatId
+            uint256 _pauserHatId,
+            uint256 _minterHatId
         )
     {
 
@@ -212,6 +214,22 @@ contract HatsDeployment is Script {
             execTransaction(safeAddr, address(hats), 0, data);
         }
 
+        // Minter
+        {
+            minterHatId = hats.getNextId(adminHatId);
+            bytes memory data = abi.encodeWithSelector(
+                Hats.createHat.selector,
+                adminHatId,
+                "ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw1",
+                uint32(100),
+                address(eligibilityModule),
+                address(toggleModule),
+                true,
+                ""
+            );
+            execTransaction(safeAddr, address(hats), 0, data);
+        }
+
         // 8) Deploy HatsSecurityContext & set role hats
         securityContext = new HatsSecurityContext(address(hats), adminHatId);
 
@@ -257,6 +275,14 @@ contract HatsDeployment is Script {
                 true
             );
             execTransaction(safeAddr, address(eligibilityModule), 0, data);
+
+            data = abi.encodeWithSelector(
+                EligibilityModule.setHatRules.selector,
+                minterHatId,
+                true,
+                true
+            );
+            execTransaction(safeAddr, address(eligibilityModule), 0, data);
         }
         {
             // Toggle hats "active" in the toggle module
@@ -291,6 +317,13 @@ contract HatsDeployment is Script {
             data = abi.encodeWithSelector(
                 ToggleModule.setHatStatus.selector,
                 pauserHatId,
+                true
+            );
+            execTransaction(safeAddr, address(toggleModule), 0, data);
+
+            data = abi.encodeWithSelector(
+                ToggleModule.setHatStatus.selector,
+                minterHatId,
                 true
             );
             execTransaction(safeAddr, address(toggleModule), 0, data);
@@ -354,6 +387,22 @@ contract HatsDeployment is Script {
             );
             execTransaction(safeAddr, address(hats), 0, data);
         }
+        // Minter
+        {
+            bytes memory data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                minterHatId,
+                adminAddress1
+            );
+            execTransaction(safeAddr, address(hats), 0, data);
+
+            data = abi.encodeWithSelector(
+                Hats.mintHat.selector,
+                minterHatId,
+                adminAddress2
+            );
+            execTransaction(safeAddr, address(hats), 0, data);
+        }
 
         // 11) Set role hats in the HatsSecurityContext
         {
@@ -384,6 +433,13 @@ contract HatsDeployment is Script {
                 pauserHatId
             );
             execTransaction(safeAddr, address(securityContext), 0, data);
+
+            data = abi.encodeWithSelector(
+                HatsSecurityContext.setRoleHat.selector,
+                Roles.MINTER_ROLE,
+                minterHatId
+            );
+            execTransaction(safeAddr, address(securityContext), 0, data);
         }
 
         vm.stopBroadcast();
@@ -396,6 +452,7 @@ contract HatsDeployment is Script {
             console2.log("DAO Hat ID:    ", daoHatId);
             console2.log("System Hat ID: ", systemHatId);
             console2.log("Pauser Hat ID: ", pauserHatId);
+            console2.log("Minter Hat ID: ", minterHatId);
 
             console2.log("-----------------------------------------------");
             console2.log("Hats Address is:             ", address(hats));
@@ -417,7 +474,8 @@ contract HatsDeployment is Script {
             arbiterHatId,
             daoHatId,
             systemHatId,
-            pauserHatId
+            pauserHatId,
+            minterHatId
         );
     }
 }
