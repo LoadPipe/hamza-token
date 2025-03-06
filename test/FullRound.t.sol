@@ -74,11 +74,21 @@ contract FullRound is DeploymentSetup {
         );
 
         // STEP 1: User deposits LOOT into GovernanceVault
-        // Let's choose a deposit amount (20) for test logic
-        uint256 depositAmount = 20*10**18;
+        // First check how much LOOT the community vault has for rewards
+        uint256 communityVaultLootBalance = lToken.balanceOf(communityVault);
+        console2.log("Community vault LOOT balance:", communityVaultLootBalance);
+        
+        // Choose a deposit amount that ensures the community vault has enough for rewards
+        // We'll deposit at most half of what the community vault has, to ensure it can match
+        uint256 depositAmount = communityVaultLootBalance > 0 
+            ? Math.min(20*10**18, communityVaultLootBalance / 2) 
+            : 20*10**18;
+        
+        console2.log("Deposit amount for test:", depositAmount);
+        
         vm.startPrank(user);
         lToken.approve(address(gVault), depositAmount);
-        gVault.deposit(depositAmount); // This mints user 20 GOV tokens
+        gVault.deposit(depositAmount); // This mints user GOV tokens equal to deposit
         vm.stopPrank();
 
         // Confirm deposit is recorded
@@ -124,51 +134,55 @@ contract FullRound is DeploymentSetup {
         assertFalse(rewardDepositDist, "Reward deposit's rewardsDistributed should be false initially");
 
         // User also gets minted additional depositAmount GOV tokens
-        userGovBalance = gToken.balanceOf(user);
-        console2.log("User GOV after reward distribution:", userGovBalance);
-        assertEq(userGovBalance, 40*10**18, "User GOV should be 40 now (20 + 20 reward)");
+        uint256 userGovBalanceAfterReward = gToken.balanceOf(user);
+        console2.log("User GOV after reward distribution:", userGovBalanceAfterReward);
+        assertEq(userGovBalanceAfterReward, userGovBalance + depositAmount, "User GOV should be doubled after reward distribution");
 
-        userLootBalance = lToken.balanceOf(user);
-        console2.log("User LOOT after reward distribution:", userLootBalance);
+        uint256 userLootBalanceAfterReward = lToken.balanceOf(user);
+        console2.log("User LOOT after reward distribution:", userLootBalanceAfterReward);
 
-        // The script minted `vaultLootAmount = 50` LOOT to the CommunityVault. 
-        // It just used 20 to pay the reward distribution, so the vault should have 30 left.
+        // Check the community vault's LOOT balance after distributing rewards
         uint256 commVaultLootBalance = lToken.balanceOf(communityVault);
         console2.log("CommunityVault LOOT after distributing reward:", commVaultLootBalance);
-        assertEq(commVaultLootBalance, 30*10**18, "CommunityVault should have 30 LOOT left after distributing 20");
+        assertEq(commVaultLootBalance, vaultLootAmountFromConfig - depositAmount, "CommunityVault should have reduced LOOT after distributing reward");
 
-        // STEP 4: Attempt partial withdrawal of 10 tokens
-        uint256 partialWithdrawAmount = 10*10**18;
+        // STEP 4: Attempt partial withdrawal of half the original deposit
+        uint256 partialWithdrawAmount = depositAmount / 2;
         vm.startPrank(user);
         gVault.withdraw(partialWithdrawAmount);
         vm.stopPrank();
 
-        // The oldest deposit (#0) had 20. We withdrew 10, so deposit #0 now has 10 left.
+        // The oldest deposit (#0) should be reduced by the partial withdrawal amount
         (uint256 updatedDep0Amt,,) = gVault.deposits(user, 0);
         console2.log("Updated deposit #0 after partial withdraw:", updatedDep0Amt);
-        assertEq(updatedDep0Amt, 10*10**18, "Deposit #0 should be reduced from 20 to 10");
+        assertEq(updatedDep0Amt, depositAmount - partialWithdrawAmount, "Deposit #0 should be reduced by withdrawal amount");
 
-        // The user burned 10 GOV tokens upon withdrawal, so GOV should be 30
-        userGovBalance = gToken.balanceOf(user);
-        console2.log("User GOV after partial withdraw:", userGovBalance);
-        assertEq(userGovBalance, 30*10**18, "User should have 30 GOV left");
+        // The user burned GOV tokens upon withdrawal
+        uint256 userGovBalanceAfterPartialWithdraw = gToken.balanceOf(user);
+        console2.log("User GOV after partial withdraw:", userGovBalanceAfterPartialWithdraw);
+        assertEq(userGovBalanceAfterPartialWithdraw, userGovBalanceAfterReward - partialWithdrawAmount, "User GOV should be reduced by withdrawal amount");
 
-        // The user gets 10 LOOT back
-        userLootBalance = lToken.balanceOf(user);
-        console2.log("User LOOT after partial withdraw:", userLootBalance);
-        assertEq(userLootBalance, 40*10**18, "User LOOT should now be 40 (30 + 10 returned)");
+        // The user gets LOOT back
+        uint256 userLootBalanceAfterPartialWithdraw = lToken.balanceOf(user);
+        console2.log("User LOOT after partial withdraw:", userLootBalanceAfterPartialWithdraw);
+        assertEq(userLootBalanceAfterPartialWithdraw, userLootBalanceAfterReward + partialWithdrawAmount, "User LOOT should increase by withdrawal amount");
 
         // STEP 5: Wait for the reward deposit (#1) to vest, then do a full withdrawal
         skip(vestingPeriodFromConfig + 1);
 
-        // Now deposit #1 has 20; deposit #0 has 10 => total 30
+        // Calculate remaining deposits (deposit #0 remainder + deposit #1)
+        uint256 remainingDeposits = (depositAmount - partialWithdrawAmount) + depositAmount;
+        
         vm.startPrank(user);
 
         uint256 initialDepositCount = getDepositCount(gVault, user);
         console2.log("User's initial deposit count:", initialDepositCount);
+        // Get the current balance of user's governance tokens before final withdrawal
+        uint256 userGovBalanceBeforeFinalWithdraw = gToken.balanceOf(user);
+        console2.log("User GOV balance before final withdraw:", userGovBalanceBeforeFinalWithdraw);
 
-        // Withdraw 30 to clear both deposits
-        gVault.withdraw(30*10**18);
+        // Withdraw all remaining deposits
+        gVault.withdraw(remainingDeposits);
 
         vm.stopPrank();
 
@@ -177,15 +191,15 @@ contract FullRound is DeploymentSetup {
         console2.log("User's deposit count after final withdraw:", depositCount);
         assertEq(depositCount, 1, "One deposit stub might remain after clearing these deposits");
 
-        // The user also burns 30 GOV tokens
-        userGovBalance = gToken.balanceOf(user);
-        console2.log("Final user GOV balance:", userGovBalance);
-        assertEq(userGovBalance, 20*10**18, "User should have 20 GOV left after final withdraw");
+        // The user also burns GOV tokens
+        uint256 userGovBalanceAfterFinalWithdraw = gToken.balanceOf(user);
+        console2.log("Final user GOV balance:", userGovBalanceAfterFinalWithdraw);
+        assertEq(userGovBalanceAfterFinalWithdraw, userGovBalanceAfterPartialWithdraw - remainingDeposits + depositAmount, "User GOV should be reduced by final withdrawal amount");
 
-        // The user receives 30 LOOT
-        userLootBalance = lToken.balanceOf(user);
-        console2.log("Final user LOOT balance:", userLootBalance);
-        assertEq(userLootBalance, 70*10**18, "User LOOT should be 70 after final withdraw");
+        // The user receives LOOT
+        uint256 userLootBalanceAfterFinalWithdraw = lToken.balanceOf(user);
+        console2.log("Final user LOOT balance:", userLootBalanceAfterFinalWithdraw);
+        assertEq(userLootBalanceAfterFinalWithdraw, userLootBalanceAfterPartialWithdraw + remainingDeposits, "User LOOT should increase by final withdrawal amount");
 
         // Voting flow: 
         HamzaGovernor gov = HamzaGovernor(governor);
@@ -222,7 +236,7 @@ contract FullRound is DeploymentSetup {
         // Check the user's voting power
         uint256 votes = gToken.getVotes(user);
         console2.log("Voting power:", votes);
-        assertEq(votes, 20*10**18, "Voting power should be 20 GOV tokens");
+        assertEq(votes, userGovBalanceAfterFinalWithdraw, "Voting power should match user's GOV balance");
 
         // The proposal should have succeeded
         state = uint256(gov.state(proposal));
@@ -231,7 +245,7 @@ contract FullRound is DeploymentSetup {
 
         // Queue and execute the proposal
         gov.queue(targets, values, calldatas, keccak256("Test proposal"));
-        vm.warp(block.timestamp + timeLockDelay +1);
+        vm.warp(block.timestamp + timeLockDelay + 1);
         gov.execute(targets, values, calldatas, keccak256("Test proposal"));
 
         // Check the proposal state
