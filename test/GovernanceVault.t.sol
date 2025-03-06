@@ -28,7 +28,7 @@ contract GovernanceVaultTest is DeploymentSetup {
     }
 
     // Test that the vault is initialized as expected
-    function testGovernanceVaultSetup() public {
+    function testGovernanceVaultSetup() public view {
         // Check vault addresses are not zero
         assertTrue(address(gVault) != address(0), "governanceVault is zero address");
         assertTrue(address(gToken) != address(0), "governanceToken is zero address");

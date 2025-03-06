@@ -18,7 +18,7 @@ import "./DeploymentSetup.t.sol";
 contract FullRound is DeploymentSetup {
 
     // Basic deployment checks
-    function testDeployment() public {
+    function testDeployment() public view {
         assertTrue(baal != address(0),          "Baal address is zero");
         assertTrue(communityVault != address(0), "CommunityVault address is zero");
         assertTrue(govToken != address(0),       "GovernanceToken address is zero");
@@ -58,7 +58,6 @@ contract FullRound is DeploymentSetup {
     // End-to-End Flow: deposit + vest + distribute rewards
     function testVestingAndRewardsFlow() public {
         // Setup references
-        CommunityVault cVault = CommunityVault(communityVault);
         GovernanceVault gVault = GovernanceVault(govVault);
         GovernanceToken gToken = GovernanceToken(govToken);
         IERC20 lToken = IERC20(lootToken);

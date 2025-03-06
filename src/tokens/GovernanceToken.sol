@@ -14,7 +14,7 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper, HasSec
             _setSecurityContext(_securityContext);
         }
 
-    function decimals() public view override(ERC20, ERC20Wrapper) returns(uint8) {
+    function decimals() public pure override(ERC20, ERC20Wrapper) returns(uint8) {
         return 18;
     }
 
