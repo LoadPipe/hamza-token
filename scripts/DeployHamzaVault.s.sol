@@ -345,6 +345,7 @@ contract DeployHamzaVault is Script {
         uint256 vestingPeriod = config.readUint(".governanceVault.vestingPeriod");
 
         GovernanceVault govVault = new GovernanceVault(
+            securityContext,
             lootTokenAddr,
             GovernanceToken(address(govToken)),
             vestingPeriod
