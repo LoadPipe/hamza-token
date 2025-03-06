@@ -654,8 +654,8 @@ contract CustomBaal is Module, EIP712Upgradeable, ReentrancyGuardUpgradeable, Ba
         if (communityVault != address(0)) {
             uint256 vaultLootBalance = lootToken.balanceOf(communityVault);
             uint256 vaultSharesBalance = sharesToken.balanceOf(communityVault);
-            adjustedTotalSupply = _totalSupply > (vaultLootBalance + vaultSharesBalance) 
-                ? _totalSupply - (vaultLootBalance + vaultSharesBalance)
+            adjustedTotalSupply = _totalSupply > (vaultLootBalance) 
+                ? _totalSupply - (vaultLootBalance)
                 : 1; // Avoid division by zero
         }
 
@@ -1018,7 +1018,7 @@ contract CustomBaal is Module, EIP712Upgradeable, ReentrancyGuardUpgradeable, Ba
 
     /// @notice Helper to check total supply of loot and shares
     function totalSupply() public view returns (uint256) {
-        return totalLoot() + totalShares();
+        return totalLoot();
     }
 
     /***************

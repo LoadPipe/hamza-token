@@ -38,7 +38,7 @@ contract DeployHamzaVault is Script {
     using stdJson for string;
     
     // (A) Deployed BaalSummoner on Sepolia
-    address constant BAAL_SUMMONER = 0x65CA4517569D468D786Cb9fAE6c78aED2F244985; 
+    address constant BAAL_SUMMONER = 0xDf9493E0AB228F6b807F5100EfC34B8E031ef8bf; 
 
     // Key addresses & params
     address public OWNER_ONE;
