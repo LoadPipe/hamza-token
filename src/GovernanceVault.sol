@@ -80,7 +80,7 @@ contract GovernanceVault is HasSecurityContext {
     }
 
     // distribute rewards to a staker
-    function distributeRewards(address staker) public {
+    function distributeRewards(address staker) public onlyRole(Roles.SYSTEM_ROLE) {
         uint256 totalReward;
         Deposit[] storage userDeposits = deposits[staker];
 
@@ -97,7 +97,7 @@ contract GovernanceVault is HasSecurityContext {
     }
 
     // admin function to set the community vault address
-    function setCommunityVault(address _communityVault) external {
+    function setCommunityVault(address _communityVault) external onlyRole(Roles.SYSTEM_ROLE) {
         require(_communityVault != address(0), "Invalid address");
         communityVault = _communityVault;
     }

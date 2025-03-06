@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/governance/TimelockController.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
 import { Hats } from "@hats-protocol/Hats.sol";
 
+//TODO: inherit from DeploymentSetup
 contract VotingTest is Test {
     HatsSecurityContext securityContext;
     GovernanceToken govToken;
