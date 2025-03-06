@@ -12,7 +12,6 @@ import "@hamza-escrow/security/HasSecurityContext.sol";
  */
 contract PurchaseTracker is HasSecurityContext {
     using SafeERC20 for IERC20;
-    address public owner;
 
     // Mapping from buyer address to cumulative purchase count and total purchase amount.
     mapping(address => uint256) public totalPurchaseCount;
@@ -46,18 +45,12 @@ contract PurchaseTracker is HasSecurityContext {
     
     event PurchaseRecorded(bytes32 indexed paymentId, address indexed buyer, uint256 amount);
     
-    modifier onlyOwner() {
-        require(msg.sender == owner, "PurchaseTracker: Not owner");
-        _;
-    }
-    
     modifier onlyAuthorized() {
         require(authorizedEscrows[msg.sender], "PurchaseTracker: Not authorized");
         _;
     }
     
     constructor(ISecurityContext securityContext, address _communityVault, address _lootToken) {
-        owner = msg.sender;
         communityVault = _communityVault;
         lootToken = IERC20(_lootToken);
         _setSecurityContext(securityContext);
