@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./tokens/GovernanceToken.sol";
 import "@hamza-escrow/security/HasSecurityContext.sol";
 
-//TODO: does it need to have its SecurityContext set?
 contract GovernanceVault is HasSecurityContext {
     using SafeERC20 for IERC20;
     
@@ -28,6 +27,7 @@ contract GovernanceVault is HasSecurityContext {
     event RewardDistributed(address indexed staker, uint256 amount);
 
     constructor(
+        ISecurityContext securityContext,
         address lootTokenAddress,
         GovernanceToken governanceTokenAddress,
         uint256 vestingPeriod
@@ -35,6 +35,8 @@ contract GovernanceVault is HasSecurityContext {
         lootToken = IERC20(lootTokenAddress);
         governanceToken = governanceTokenAddress;
         vestingPeriodSeconds = vestingPeriod;
+
+        _setSecurityContext(securityContext);
     }
 
     // deposit loot tokens into the vault
@@ -78,7 +80,7 @@ contract GovernanceVault is HasSecurityContext {
     }
 
     // distribute rewards to a staker
-    function distributeRewards(address staker) public {
+    function distributeRewards(address staker) public onlyRole(Roles.SYSTEM_ROLE) {
         uint256 totalReward;
         Deposit[] storage userDeposits = deposits[staker];
 
@@ -92,6 +94,12 @@ contract GovernanceVault is HasSecurityContext {
 
         require(totalReward > 0, "No rewards available");
         _processRewardDistribution(staker, totalReward);
+    }
+
+    // admin function to set the community vault address
+    function setCommunityVault(address _communityVault) external onlyRole(Roles.SYSTEM_ROLE) {
+        require(_communityVault != address(0), "Invalid address");
+        communityVault = _communityVault;
     }
 
     // helper function to process new deposits
@@ -140,11 +148,5 @@ contract GovernanceVault is HasSecurityContext {
         
         governanceToken.mint(staker, amount);
         emit RewardDistributed(staker, amount);
-    }
-
-    // admin function to set the community vault address
-    function setCommunityVault(address _communityVault) external {
-        require(_communityVault != address(0), "Invalid address");
-        communityVault = _communityVault;
     }
 }

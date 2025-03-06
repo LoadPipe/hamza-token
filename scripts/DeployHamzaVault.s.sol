@@ -62,6 +62,8 @@ contract DeployHamzaVault is Script {
     address public hats;
     address public hatsSecurityContextAddr;
     uint256 public daoHatId;
+    uint256 public minterHatId;
+    uint256 public burnerHatId;
     string public config;
 
     function run()
@@ -102,6 +104,8 @@ contract DeployHamzaVault is Script {
             address _hats,
             uint256 _adminHatId,
             uint256 _daoHatId,
+            uint256 _minterHatId,
+            uint256 _burnerHatId,
             address _hatsSecurityContextAddr
         ) = deployHats();
         
@@ -110,6 +114,8 @@ contract DeployHamzaVault is Script {
         hats = _hats;
         adminHatId = _adminHatId;
         daoHatId = _daoHatId;
+        minterHatId = _minterHatId;
+        burnerHatId = _burnerHatId;
         hatsSecurityContextAddr = _hatsSecurityContextAddr;
 
         // 4) Start broadcast for subsequent deployments
@@ -119,13 +125,17 @@ contract DeployHamzaVault is Script {
         (address newBaalAddr, address payable vault, address lootTokenAddr) = deployBaalAndCommunityVault();
         
         // 9-10) Deploy governance token and vault
-        (address govTokenAddr, address govVaultAddr) = deployGovernanceContracts(lootTokenAddr, vault);
+        (address govTokenAddr, address govVaultAddr) = deployGovernanceContracts(
+            ISecurityContext(hatsSecurityContextAddr), 
+            lootTokenAddr, 
+            vault
+        );
         
         // 11-14) Deploy Timelock and Governor
         address timelockAddr = deployGovernorAndTimelock(govTokenAddr);
         
         // 15-16) Deploy PurchaseTracker, PaymentEscrow, and EscrowMulticall
-        deployEscrowContracts(vault, lootTokenAddr);
+        deployEscrowContracts(ISecurityContext(hatsSecurityContextAddr), vault, lootTokenAddr);
         
         vm.stopBroadcast();
 
@@ -155,6 +165,8 @@ contract DeployHamzaVault is Script {
         address _hats,
         uint256 _adminHatId,
         uint256 _daoHatId,
+        uint256 _minterHatId,
+        uint256 _burnerHatId,
         address _hatsSecurityContextAddr
     ) {
         HatsDeployment hatsDeployment = new HatsDeployment();
@@ -175,7 +187,9 @@ contract DeployHamzaVault is Script {
             arbiterHatId,
             _daoHatId,
             systemHatId,
-            pauserHatId
+            pauserHatId,
+            _minterHatId,
+            _burnerHatId
         ) = hatsDeployment.run();
         
         return (
@@ -183,6 +197,8 @@ contract DeployHamzaVault is Script {
             _hats,
             _adminHatId,
             _daoHatId,
+            _minterHatId,
+            _burnerHatId,
             _hatsSecurityContextAddr
         );
     }
@@ -305,6 +321,7 @@ contract DeployHamzaVault is Script {
     }
     
     function deployGovernanceContracts(
+        ISecurityContext securityContext,
         address lootTokenAddr,
         address payable vault
     ) internal returns (
@@ -316,6 +333,7 @@ contract DeployHamzaVault is Script {
         string memory govTokenSymbol = config.readString(".governanceToken.symbol");
 
         GovernanceToken govToken = new GovernanceToken(
+            securityContext, 
             IERC20(lootTokenAddr),
             govTokenName,
             govTokenSymbol
@@ -327,6 +345,7 @@ contract DeployHamzaVault is Script {
         uint256 vestingPeriod = config.readUint(".governanceVault.vestingPeriod");
 
         GovernanceVault govVault = new GovernanceVault(
+            securityContext,
             lootTokenAddr,
             GovernanceToken(address(govToken)),
             vestingPeriod
@@ -335,8 +354,12 @@ contract DeployHamzaVault is Script {
         govVaultAddr = address(govVault);
 
         // link the community vault <-> governance vault
-        CommunityVault(vault).setGovernanceVault(address(govVault), lootTokenAddr);
+        CommunityVault(vault).setGovernanceVault(govVaultAddr, lootTokenAddr);
         govVault.setCommunityVault(vault);
+
+        //Assign minter & burner hats to the governance vault
+        assignHat(minterHatId, govVaultAddr);
+        assignHat(burnerHatId, govVaultAddr);
         
         return (govTokenAddr, govVaultAddr);
     }
@@ -376,33 +399,20 @@ contract DeployHamzaVault is Script {
         timelock.grantRole(0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1, address(governor));
 
         // 14) grant timelock dao role to the governor
-        {
-            bytes memory data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                daoHatId,
-                address(timelock)
-            );
-
-            SafeTransactionHelper.execTransaction(
-                safeAddr,
-                hats,
-                0,
-                data,
-                OWNER_ONE
-            );
-        }
+        assignHat(daoHatId, address(timelock));
         
         return timelockAddr;
     }
     
     function deployEscrowContracts(
+        ISecurityContext securityContext,
         address payable vault,
         address lootTokenAddr
     ) internal {
         bool autoRelease = config.readBool(".escrow.autoRelease");
         
         // 15) Deploy PurchaseTracker
-        PurchaseTracker purchaseTracker = new PurchaseTracker(vault, lootTokenAddr);
+        PurchaseTracker purchaseTracker = new PurchaseTracker(securityContext, vault, lootTokenAddr);
 
         //setPurchaseTracker in community vault
         CommunityVault(vault).setPurchaseTracker(address(purchaseTracker), lootTokenAddr);
@@ -465,5 +475,22 @@ contract DeployHamzaVault is Script {
         uint256[] memory arr = new uint256[](1);
         arr[0] = _val;
         return arr;
+    }
+
+    function assignHat(uint256 hatId, address recipient) private 
+    {
+        bytes memory data = abi.encodeWithSelector(
+            Hats.mintHat.selector,
+            hatId,
+            recipient
+        );
+
+        SafeTransactionHelper.execTransaction(
+            safeAddr,
+            hats,
+            0,
+            data,
+            OWNER_ONE
+        );
     }
 }

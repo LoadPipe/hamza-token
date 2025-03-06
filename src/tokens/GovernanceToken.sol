@@ -8,27 +8,29 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Wrapper.sol";
 import "@hamza-escrow/security/HasSecurityContext.sol"; 
 
-contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper {
-    constructor(IERC20 wrappedToken, string memory name_, string memory symbol_) 
-        ERC20("HamGov", "HAM") ERC20Permit("HamGov") ERC20Wrapper(wrappedToken) {}
+contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, ERC20Wrapper, HasSecurityContext {
+    constructor(ISecurityContext securityContext, IERC20 wrappedToken, string memory /*name_*/, string memory /*symbol_*/) 
+        ERC20("HamGov", "HAM") ERC20Permit("HamGov") ERC20Wrapper(wrappedToken) {
+            _setSecurityContext(securityContext);
+        }
 
-    function decimals() public view override(ERC20, ERC20Wrapper) returns(uint8) {
+    function decimals() public pure override(ERC20, ERC20Wrapper) returns(uint8) {
         return 18;
     }
 
-    function mint(address to, uint256 amount) external /* onlyRole(MINTER_ROLE) */ {
+    function mint(address to, uint256 amount) external onlyRole(Roles.MINTER_ROLE) {
         _mint(to, amount);
     }
 
-    function burn(address account, uint256 amount) external /* onlyRole(BURNER_ROLE) */ {
+    function burn(address account, uint256 amount) external onlyRole(Roles.BURNER_ROLE) {
         _burn(account, amount);
     }
     
-    function depositFor(address account, uint256 amount) public override(ERC20Wrapper) returns (bool) /* onlyRole(MINTER_ROLE) */ {
+    function depositFor(address account, uint256 amount) public override(ERC20Wrapper) onlyRole(Roles.MINTER_ROLE) returns (bool) {
         return super.depositFor(account, amount);
     }
 
-    function withdrawTo(address account, uint256 amount) public override(ERC20Wrapper) returns (bool) /* onlyRole(MINTER_ROLE) */ {
+    function withdrawTo(address account, uint256 amount) public override(ERC20Wrapper) onlyRole(Roles.MINTER_ROLE) returns (bool) {
         return super.withdrawTo(account, amount);
     }
 

@@ -63,7 +63,7 @@ contract CommunityVault is HasSecurityContext {
      * @param to The address to send the tokens or ETH to
      * @param amount The amount to withdraw
      */
-    function withdraw(address token, address to, uint256 amount) external onlyRole(Roles.ADMIN_ROLE) {
+    function withdraw(address token, address to, uint256 amount) external onlyRole(Roles.SYSTEM_ROLE) {
         require(tokenBalances[token] >= amount, "Insufficient balance");
 
         if (token == address(0)) {
@@ -90,7 +90,7 @@ contract CommunityVault is HasSecurityContext {
         address token,
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) external onlyRole(Roles.ADMIN_ROLE) {
+    ) external onlyRole(Roles.SYSTEM_ROLE) {
         require(recipients.length == amounts.length, "Mismatched arrays");
 
         for (uint256 i = 0; i < recipients.length; i++) {

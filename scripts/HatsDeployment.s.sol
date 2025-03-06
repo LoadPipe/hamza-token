@@ -47,6 +47,8 @@ contract HatsDeployment is Script {
     uint256 public topHatId;
     uint256 public systemHatId;
     uint256 public pauserHatId;
+    uint256 public minterHatId;
+    uint256 public burnerHatId;
 
     // Deployer's private key and derived addresses
     uint256 internal deployerPk;
@@ -79,7 +81,9 @@ contract HatsDeployment is Script {
             uint256 _arbiterHatId,
             uint256 _daoHatId,
             uint256 _systemHatId,
-            uint256 _pauserHatId
+            uint256 _pauserHatId,
+            uint256 _minterHatId, 
+            uint256 _burnerHatId
         )
     {
 
@@ -147,244 +151,64 @@ contract HatsDeployment is Script {
         adminHatId = uint256(hats.lastTopHatId()) << 224;
 
         // 7) Create child Hats
-
-        // Arbiter
-        {
-            arbiterHatId = hats.getNextId(adminHatId);
-            bytes memory data = abi.encodeWithSelector(
-                Hats.createHat.selector,
-                adminHatId,
-                "ipfs://bafkreicbhbvddt2f475inukntzh6n72ehm4iyljstyyjsmizdsojmbdase",
-                uint32(2),
-                address(eligibilityModule),
-                address(toggleModule),
-                true,
-                ""
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
-        }
-        
-        // DAO
-        {
-            daoHatId = hats.getNextId(adminHatId);
-            bytes memory data = abi.encodeWithSelector(
-                Hats.createHat.selector,
-                adminHatId,
-                "ipfs://bafkreic2f5b6ykdvafs5nhkouruvlql73caou5etgdrx67yt6ofp6pwf24",
-                uint32(2),
-                address(eligibilityModule),
-                address(toggleModule),
-                true,
-                ""
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
-        }
-
-        // System
-        {
-            systemHatId = hats.getNextId(adminHatId);
-            bytes memory data = abi.encodeWithSelector(
-                Hats.createHat.selector,
-                adminHatId,
-                "ipfs://bafkreie2vxohaw7cneknlwv6hq7h4askkv6jfcadho6efz5bxfx66fqu3q",
-                uint32(2),
-                address(eligibilityModule),
-                address(toggleModule),
-                true,
-                ""
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
-        }
-
-        // Pauser
-        {
-            pauserHatId = hats.getNextId(adminHatId);
-            bytes memory data = abi.encodeWithSelector(
-                Hats.createHat.selector,
-                adminHatId,
-                "ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw4",
-                uint32(2),
-                address(eligibilityModule),
-                address(toggleModule),
-                true,
-                ""
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
-        }
+        arbiterHatId = createHat("ipfs://bafkreicbhbvddt2f475inukntzh6n72ehm4iyljstyyjsmizdsojmbdase", 2);
+        daoHatId = createHat("ipfs://bafkreic2f5b6ykdvafs5nhkouruvlql73caou5etgdrx67yt6ofp6pwf24", 2);
+        systemHatId = createHat("ipfs://bafkreie2vxohaw7cneknlwv6hq7h4askkv6jfcadho6efz5bxfx66fqu3q", 2);
+        pauserHatId = createHat("ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw4", 2);
+        minterHatId = createHat("ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw1", 100);
+        burnerHatId = createHat("ipfs://bafkreiczfbtftesggzcfnumcy7rfru665a77uyznbabdk5b6ftfo2hvjw2", 100);
 
         // 8) Deploy HatsSecurityContext & set role hats
         securityContext = new HatsSecurityContext(address(hats), adminHatId);
 
         // 9) Configure eligibility + toggle modules
-        {
-            // Configure each hat's rules in the eligibility module
-            bytes memory data = abi.encodeWithSelector(
-                EligibilityModule.setHatRules.selector,
-                adminHatId,
-                true,
-                true
-            );
-            execTransaction(safeAddr, address(eligibilityModule), 0, data);
-
-            data = abi.encodeWithSelector(
-                EligibilityModule.setHatRules.selector,
-                arbiterHatId,
-                true,
-                true
-            );
-            execTransaction(safeAddr, address(eligibilityModule), 0, data);
-
-            data = abi.encodeWithSelector(
-                EligibilityModule.setHatRules.selector,
-                daoHatId,
-                true,
-                true
-            );
-            execTransaction(safeAddr, address(eligibilityModule), 0, data);
-
-            data = abi.encodeWithSelector(
-                EligibilityModule.setHatRules.selector,
-                systemHatId,
-                true,
-                true
-            );
-            execTransaction(safeAddr, address(eligibilityModule), 0, data);
-
-            data = abi.encodeWithSelector(
-                EligibilityModule.setHatRules.selector,
-                pauserHatId,
-                true,
-                true
-            );
-            execTransaction(safeAddr, address(eligibilityModule), 0, data);
-        }
-        {
-            // Toggle hats "active" in the toggle module
-            bytes memory data = abi.encodeWithSelector(
-                ToggleModule.setHatStatus.selector,
-                adminHatId,
-                true
-            );
-            execTransaction(safeAddr, address(toggleModule), 0, data);
-
-            data = abi.encodeWithSelector(
-                ToggleModule.setHatStatus.selector,
-                arbiterHatId,
-                true
-            );
-            execTransaction(safeAddr, address(toggleModule), 0, data);
-
-            data = abi.encodeWithSelector(
-                ToggleModule.setHatStatus.selector,
-                daoHatId,
-                true
-            );
-            execTransaction(safeAddr, address(toggleModule), 0, data);
-
-            data = abi.encodeWithSelector(
-                ToggleModule.setHatStatus.selector,
-                systemHatId,
-                true
-            );
-            execTransaction(safeAddr, address(toggleModule), 0, data);
-
-            data = abi.encodeWithSelector(
-                ToggleModule.setHatStatus.selector,
-                pauserHatId,
-                true
-            );
-            execTransaction(safeAddr, address(toggleModule), 0, data);
-        }
+        setHatRules(adminHatId, true, true);
+        setHatRules(arbiterHatId, true, true);
+        setHatRules(daoHatId, true, true);
+        setHatRules(systemHatId, true, true);
+        setHatRules(pauserHatId, true, true);
+        setHatRules(minterHatId, true, true);
+        setHatRules(burnerHatId, true, true);
+        
+        setHatStatus(adminHatId, true);
+        setHatStatus(arbiterHatId, true);
+        setHatStatus(daoHatId, true);
+        setHatStatus(systemHatId, true);
+        setHatStatus(pauserHatId, true);
+        setHatStatus(minterHatId, true);
+        setHatStatus(burnerHatId, true);
 
         // 10) Mint hats to relevant addresses
-        // Arbiter
-        {
-            bytes memory data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                arbiterHatId,
-                adminAddress1
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
+        //Arbiter
+        mintHat(arbiterHatId, adminAddress1);
+        mintHat(arbiterHatId, adminAddress2);
 
-            data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                arbiterHatId,
-                adminAddress2
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
-        }
-        // DAO
-        {
-            bytes memory data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                daoHatId,
-                adminAddress1
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
-        }
-        // System
-        {
-            bytes memory data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                systemHatId,
-                adminAddress1
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
+        //DAO
+        mintHat(daoHatId, adminAddress1);
 
-            data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                systemHatId,
-                adminAddress2
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
-        }
-        // Pauser
-        {
-            bytes memory data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                pauserHatId,
-                adminAddress1
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
+        //System
+        mintHat(systemHatId, adminAddress1);
+        mintHat(systemHatId, adminAddress2);
 
-            data = abi.encodeWithSelector(
-                Hats.mintHat.selector,
-                pauserHatId,
-                adminAddress2
-            );
-            execTransaction(safeAddr, address(hats), 0, data);
-        }
+        //Pauser
+        mintHat(pauserHatId, adminAddress1);
+        mintHat(pauserHatId, adminAddress2);
+
+        //Minter 
+        mintHat(minterHatId, adminAddress1);
+        mintHat(minterHatId, adminAddress2);
+
+        //Burner 
+        mintHat(burnerHatId, adminAddress1);
+        mintHat(burnerHatId, adminAddress2);
 
         // 11) Set role hats in the HatsSecurityContext
-        {
-            bytes memory data = abi.encodeWithSelector(
-                HatsSecurityContext.setRoleHat.selector,
-                Roles.ARBITER_ROLE,
-                arbiterHatId
-            );
-            execTransaction(safeAddr, address(securityContext), 0, data);
-
-            data = abi.encodeWithSelector(
-                HatsSecurityContext.setRoleHat.selector,
-                Roles.DAO_ROLE,
-                daoHatId
-            );
-            execTransaction(safeAddr, address(securityContext), 0, data);
-
-            data = abi.encodeWithSelector(
-                HatsSecurityContext.setRoleHat.selector,
-                Roles.SYSTEM_ROLE,
-                systemHatId
-            );
-            execTransaction(safeAddr, address(securityContext), 0, data);
-
-            data = abi.encodeWithSelector(
-                HatsSecurityContext.setRoleHat.selector,
-                Roles.PAUSER_ROLE,
-                pauserHatId
-            );
-            execTransaction(safeAddr, address(securityContext), 0, data);
-        }
+        setHatRole(arbiterHatId, Roles.ARBITER_ROLE);
+        setHatRole(daoHatId, Roles.DAO_ROLE);
+        setHatRole(systemHatId, Roles.SYSTEM_ROLE);
+        setHatRole(pauserHatId, Roles.PAUSER_ROLE);
+        setHatRole(minterHatId, Roles.MINTER_ROLE);
+        setHatRole(burnerHatId, Roles.BURNER_ROLE);
 
         vm.stopBroadcast();
 
@@ -396,6 +220,8 @@ contract HatsDeployment is Script {
             console2.log("DAO Hat ID:    ", daoHatId);
             console2.log("System Hat ID: ", systemHatId);
             console2.log("Pauser Hat ID: ", pauserHatId);
+            console2.log("Minter Hat ID: ", minterHatId);
+            console2.log("Burner Hat ID: ", burnerHatId);
 
             console2.log("-----------------------------------------------");
             console2.log("Hats Address is:             ", address(hats));
@@ -417,7 +243,62 @@ contract HatsDeployment is Script {
             arbiterHatId,
             daoHatId,
             systemHatId,
-            pauserHatId
+            pauserHatId,
+            minterHatId,
+            burnerHatId
         );
+    }
+
+    function createHat(string memory uri, uint32 maxSupply) private returns (uint256) {
+        uint256 hatId = hats.getNextId(adminHatId);
+        bytes memory data = abi.encodeWithSelector(
+            Hats.createHat.selector,
+            adminHatId,
+            uri,
+            maxSupply,
+            address(eligibilityModule),
+            address(toggleModule),
+            true,
+            ""
+        );
+        execTransaction(deployedSafe, address(hats), 0, data);
+        return hatId;
+    }
+
+    function setHatRules(uint256 hatId, bool eligible, bool standing) private {
+        bytes memory data = abi.encodeWithSelector(
+            EligibilityModule.setHatRules.selector,
+            hatId,
+            eligible,
+            standing
+        );
+        execTransaction(deployedSafe, address(eligibilityModule), 0, data);
+    }
+
+    function setHatStatus(uint256 hatId, bool active) private {
+        bytes memory data = abi.encodeWithSelector(
+            ToggleModule.setHatStatus.selector,
+            hatId,
+            active
+        );
+        execTransaction(deployedSafe, address(toggleModule), 0, data);
+    }
+
+    function mintHat(uint256 hatId, address recipient) private {
+        bytes memory data = abi.encodeWithSelector(
+            Hats.mintHat.selector,
+            hatId,
+            recipient
+        );
+        execTransaction(deployedSafe, address(hats), 0, data);
+    }
+
+    function setHatRole(uint256 hatId, bytes32 role) private {
+        bytes memory data = abi.encodeWithSelector(
+            HatsSecurityContext.setRoleHat.selector,
+            role,
+            hatId
+        );
+        execTransaction(deployedSafe, address(securityContext), 0, data);
     }
 }
