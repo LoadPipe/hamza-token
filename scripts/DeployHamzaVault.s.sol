@@ -135,7 +135,7 @@ contract DeployHamzaVault is Script {
         address timelockAddr = deployGovernorAndTimelock(govTokenAddr);
         
         // 15-16) Deploy PurchaseTracker, PaymentEscrow, and EscrowMulticall
-        deployEscrowContracts(vault, lootTokenAddr);
+        deployEscrowContracts(ISecurityContext(hatsSecurityContextAddr), vault, lootTokenAddr);
         
         vm.stopBroadcast();
 
@@ -405,13 +405,14 @@ contract DeployHamzaVault is Script {
     }
     
     function deployEscrowContracts(
+        ISecurityContext securityContext,
         address payable vault,
         address lootTokenAddr
     ) internal {
         bool autoRelease = config.readBool(".escrow.autoRelease");
         
         // 15) Deploy PurchaseTracker
-        PurchaseTracker purchaseTracker = new PurchaseTracker(vault, lootTokenAddr);
+        PurchaseTracker purchaseTracker = new PurchaseTracker(securityContext, vault, lootTokenAddr);
 
         //setPurchaseTracker in community vault
         CommunityVault(vault).setPurchaseTracker(address(purchaseTracker), lootTokenAddr);

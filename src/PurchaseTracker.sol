@@ -3,13 +3,14 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@hamza-escrow/security/HasSecurityContext.sol";
 
 /**
  * @title PurchaseTracker
  * @notice A singleton contract that records purchase data.
  *
  */
-contract PurchaseTracker {
+contract PurchaseTracker is HasSecurityContext {
     using SafeERC20 for IERC20;
     address public owner;
 
@@ -55,10 +56,11 @@ contract PurchaseTracker {
         _;
     }
     
-    constructor(address _communityVault, address _lootToken) {
+    constructor(ISecurityContext securityContext, address _communityVault, address _lootToken) {
         owner = msg.sender;
         communityVault = _communityVault;
         lootToken = IERC20(_lootToken);
+        _setSecurityContext(securityContext);
     }
     
     /**
