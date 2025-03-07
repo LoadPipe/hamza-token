@@ -243,6 +243,35 @@ contract TestPaymentAndTracker is DeploymentSetup {
         payEscrow2.releaseEscrow(paymentId);
     }
 
+    function testTestAbilityToAuthorizeEscrow() public {
+        //create an unauthorized escrow
+        PaymentEscrow payEscrow2 = new PaymentEscrow(payEscrow.securityContext(), systemSettings1, autoRelease, IPurchaseTracker(purchaseTracker));
+
+        //non-admin can't do it
+        vm.expectRevert();
+        tracker.authorizeEscrow(address(payEscrow2));
+        assertFalse(tracker.authorizedEscrows(address(payEscrow2)));
+
+        //admin can do it
+        vm.prank(admin);
+        tracker.authorizeEscrow(address(payEscrow2));
+        assertTrue(tracker.authorizedEscrows(address(payEscrow2)));
+    }
+
+    function testTestAbilityToDeauthorizeEscrow() public {
+        assertTrue(tracker.authorizedEscrows(address(payEscrow)));
+
+        //non-admin can't do it
+        vm.expectRevert();
+        tracker.deauthorizeEscrow(address(payEscrow));
+        assertTrue(tracker.authorizedEscrows(address(payEscrow)));
+
+        //admin can do it
+        vm.prank(admin);
+        tracker.deauthorizeEscrow(address(payEscrow));
+        assertFalse(tracker.authorizedEscrows(address(payEscrow)));
+    }
+
     function testPartialRefundThenRelease() public {
         // 1. Setup data
         bytes32 paymentId = keccak256("payment-test-2");
