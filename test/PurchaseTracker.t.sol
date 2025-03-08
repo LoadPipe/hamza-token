@@ -257,6 +257,9 @@ contract TestPaymentAndTracker is DeploymentSetup {
         tracker.distributeReward(arbiter);
     }
 
+    //TODO: TEST: test that PurchaseRecorded event is emitted
+    //TODO: TEST: test 'PurchaseTracker: Purchase already recorded' error 
+
 
     function payEscrowSettingsFee() internal view returns (uint256) {
         return systemSettings1.feeBps();
