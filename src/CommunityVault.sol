@@ -117,7 +117,7 @@ contract CommunityVault is HasSecurityContext {
     * @param vault The address of the governance vault
     * @param lootToken The address of the ERC20 token for which you'd like to grant unlimited allowance
     */
-    function setGovernanceVault(address vault, address lootToken)
+    function setGovernanceVault(address vault, address lootToken) external onlyRole(Roles.SYSTEM_ROLE) 
         external
     {
         require(vault != address(0), "Invalid staking contract address");
@@ -130,7 +130,7 @@ contract CommunityVault is HasSecurityContext {
         IERC20(lootToken).safeApprove(vault, type(uint256).max);
     }
 
-    function setPurchaseTracker(address _purchaseTracker, address lootToken) external {
+    function setPurchaseTracker(address _purchaseTracker, address lootToken) external onlyRole(Roles.SYSTEM_ROLE) {
         require(_purchaseTracker != address(0), "Invalid purchase tracker address");
         require(lootToken != address(0), "Invalid loot token address");
         
