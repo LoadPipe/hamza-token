@@ -125,12 +125,40 @@ contract TestCommunityVault is DeploymentSetup {
     
     // Test that deposit transfers token in the correct way
     function testDepositTransfersTokens() public {
+        uint256 depositAmount1 = 1000;
+        uint256 depositAmount2 = 1100;
+        uint256 depositAmount3 = 1200;
 
+        //initial balances
+        uint256 initialDepositor1Balance = loot.balanceOf(depositor1);
+        uint256 initialDepositor2Balance = loot.balanceOf(depositor2);
+        uint256 initialVaultBalance = loot.balanceOf(address(vault));
+
+        //first deposit 
+        deposit(depositor1, IERC20(loot), depositAmount1);
+
+        //check balances
+        assertEq(loot.balanceOf(depositor1), (initialDepositor1Balance - depositAmount1));
+        assertEq(loot.balanceOf(address(vault)), (initialVaultBalance + depositAmount1));
+
+        //second deposit 
+        deposit(depositor1, IERC20(loot), depositAmount2);
+
+        //check balances
+        assertEq(loot.balanceOf(depositor1), (initialDepositor1Balance - depositAmount1 - depositAmount2));
+        assertEq(loot.balanceOf(address(vault)), (initialVaultBalance + depositAmount1 + depositAmount2));
+
+        //third deposit 
+        deposit(depositor2, IERC20(loot), depositAmount3);
+
+        //check balances
+        assertEq(loot.balanceOf(depositor2), (initialDepositor2Balance - depositAmount3));
+        assertEq(loot.balanceOf(address(vault)), (initialVaultBalance + depositAmount1 + depositAmount2 + depositAmount3));
     }
     
     // Test that deposit transfers ETH in the correct way
     function testDepositTransfersEth() public {
-
+        
     }
     
     // Test that deposit behaves correctly when balance too low 
