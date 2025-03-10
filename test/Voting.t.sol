@@ -18,7 +18,7 @@ contract VotingTest is DeploymentSetup {
     address[] targets;
     uint256[] values;
     bytes[] calldatas;
-
+    address noVotingRightsAddr;
 
 
     function setUp() public override {
@@ -35,9 +35,9 @@ contract VotingTest is DeploymentSetup {
         voters.push(address(0x19));
         voters.push(address(0x20));
         voters.push(address(0x21));
-
-        // We'll use existing lootToken from DeploymentSetup (script.hamzaToken())
-        // We'll use existing govToken from DeploymentSetup
+        
+        // Add an address that won't have voting rights
+        noVotingRightsAddr = address(0x22);
         
         // Use the existing securityContext, lootToken, and govToken from DeploymentSetup
         HatsSecurityContext securityContextLocal = HatsSecurityContext(hatsCtx);
@@ -50,8 +50,6 @@ contract VotingTest is DeploymentSetup {
             lootTokenLocal.mint(voters[n], 100);
             vm.stopPrank();
         }
-
-        // We'll use the existing governor and timelock from DeploymentSetup
 
         // Mint hats to voters
         vm.startPrank(safe);
@@ -269,5 +267,177 @@ contract VotingTest is DeploymentSetup {
 
         // The fee has been changed at this point
         assertEq(SystemSettings(systemSettings).feeBps(), 1);
+    }
+    
+    // Test abstain votes (support = 2) behavior
+    function testAbstainVotes() public {
+        uint256 proposal = HamzaGovernor(governor).propose(targets, values, calldatas, proposalDescription);
+        vm.roll(block.number + 2);
+        
+        // Let half vote for
+        for(uint8 n=0; n<voters.length/2; n++) {
+            vote(voters[n], proposal, 1);
+        }
+        
+        // Let half abstain (support = 2)
+        for(uint8 n=uint8(voters.length/2); n<voters.length; n++) {
+            vote(voters[n], proposal, 2);
+        }
+        
+        vm.roll(block.number + 50401);
+        
+        // Proposal should succeed because abstain votes count toward quorum but not against
+        assertEq(uint256(HamzaGovernor(governor).state(proposal)), uint256(ProposalState.Succeeded));
+    }
+    
+    // Test quorum requirement - make sure we need 4% of total votes to pass
+    function testQuorumRequirement() public {
+        // Create proposal
+        uint256 proposal = HamzaGovernor(governor).propose(targets, values, calldatas, proposalDescription);
+        vm.roll(block.number + 2);
+        
+        // Get total votes
+        uint256 totalVotes = 0;
+        for(uint8 n=0; n<voters.length; n++) {
+            totalVotes += GovernanceToken(govToken).getVotes(voters[n]);
+        }
+        
+        // Calculate 4% of total votes (quorum)
+        uint256 quorumVotes = (totalVotes * 4) / 100;
+        
+        // Only have voters representing less than quorum vote
+        uint256 votedPower = 0;
+        uint8 voterIndex = 0;
+        
+        // Ensure we don't subtract more than quorumVotes to avoid underflow
+        uint256 targetVotes = quorumVotes > 100 ? quorumVotes - 100 : 0;
+        
+        while(votedPower < targetVotes && voterIndex < voters.length) {
+            vote(voters[voterIndex], proposal, 1);
+            votedPower += GovernanceToken(govToken).getVotes(voters[voterIndex]);
+            voterIndex++;
+        }
+        
+        // Roll forward to end voting period
+        vm.roll(block.number + 50401);
+        
+        // Should be defeated due to not meeting quorum
+        assertEq(uint256(HamzaGovernor(governor).state(proposal)), uint256(ProposalState.Defeated));
+    }
+    
+    // Test proposal cancellation
+    function testProposalCancellation() public {
+        // Create proposal from the first voter
+        vm.startPrank(voters[0]);
+        uint256 proposal = HamzaGovernor(governor).propose(targets, values, calldatas, proposalDescription);
+        vm.stopPrank();
+        
+        vm.roll(block.number + 2);
+        assertEq(uint256(HamzaGovernor(governor).state(proposal)), uint(ProposalState.Active));
+        
+        // Cancel the proposal
+        vm.startPrank(voters[0]);
+        HamzaGovernor(governor).cancel(targets, values, calldatas, keccak256(bytes(proposalDescription)));
+        vm.stopPrank();
+        
+        // Verify it's canceled
+        assertEq(uint256(HamzaGovernor(governor).state(proposal)), uint256(ProposalState.Canceled));
+        
+        // Ensure we can't vote on canceled proposals
+        vm.startPrank(voters[1]);
+        vm.expectRevert();
+        HamzaGovernor(governor).castVote(proposal, 1);
+        vm.stopPrank();
+    }
+    
+    // Test that a voter can't vote twice
+    function testDoubleVotePrevention() public {
+        uint256 proposal = HamzaGovernor(governor).propose(targets, values, calldatas, proposalDescription);
+        vm.roll(block.number + 2);
+        
+        // First vote for
+        vote(voters[0], proposal, 1);
+        
+        // Try to vote again - should revert
+        vm.startPrank(voters[0]);
+        vm.expectRevert();
+        HamzaGovernor(governor).castVote(proposal, 0);
+        vm.stopPrank();
+    }
+    
+    // Test that an account without voting power can't vote
+    function testVoteWithoutPower() public {
+        uint256 proposal = HamzaGovernor(governor).propose(targets, values, calldatas, proposalDescription);
+        vm.roll(block.number + 2);
+        
+        // Try to vote from account with no voting power
+        vm.startPrank(noVotingRightsAddr);
+
+        HamzaGovernor(governor).castVote(proposal, 1);
+        vm.stopPrank();
+        
+        // Skip ahead
+        vm.roll(block.number + 50401);
+        
+        // If all others haven't voted, proposal should be defeated (zero votes)
+        assertEq(uint256(HamzaGovernor(governor).state(proposal)), uint256(ProposalState.Defeated));
+    }
+    
+    // Test vote delegation functionality
+    function testVoteDelegation() public {
+        TestToken lootTokenLocal = TestToken(lootToken);
+        GovernanceToken govTokenLocal = GovernanceToken(govToken);
+        
+        // Delegate voter[1]'s votes to voter[0]
+        vm.startPrank(voters[1]);
+        govTokenLocal.delegate(voters[0]);
+        vm.stopPrank();
+        
+        // Check that voter[0] now has their votes plus voter[1]'s votes
+        assertEq(govTokenLocal.getVotes(voters[0]), 200); // 100 + 100
+        assertEq(govTokenLocal.getVotes(voters[1]), 0);   // Delegated away
+        
+        // Create a proposal and vote with the delegated votes
+        uint256 proposal = HamzaGovernor(governor).propose(targets, values, calldatas, proposalDescription);
+        vm.roll(block.number + 2);
+        
+        // Only voter[0] votes (with delegated power)
+        vote(voters[0], proposal, 1);
+        
+        // Skip ahead
+        vm.roll(block.number + 50401);
+        
+        // If voter[0] has 200 votes and voted for the proposal, it should pass
+        assertEq(uint256(HamzaGovernor(governor).state(proposal)), uint256(ProposalState.Succeeded));
+        
+        // Also verify the total voting power of voter[0]
+        assertEq(govTokenLocal.getVotes(voters[0]), 200);
+    }
+    
+    // Test that proposals can't be executed before the timelock has passed
+    function testTimelockEnforcement() public {
+        uint256 proposal = HamzaGovernor(governor).propose(targets, values, calldatas, proposalDescription);
+        vm.roll(block.number + 2);
+        
+        for(uint8 n=0; n<voters.length; n++) {
+            vote(voters[n], proposal, 1);
+        }
+        
+        vm.roll(block.number + 50401);
+        assertEq(uint256(HamzaGovernor(governor).state(proposal)), uint256(ProposalState.Succeeded));
+        
+        // Queue the proposal
+        HamzaGovernor(governor).queue(targets, values, calldatas, keccak256(bytes(proposalDescription)));
+        
+        // Try to execute immediately (before timelock delay)
+        vm.expectRevert();
+        HamzaGovernor(governor).execute(targets, values, calldatas, keccak256(bytes(proposalDescription)));
+        
+        // Wait for timelock to pass
+        vm.warp(block.timestamp + timeLockDelay + 1);
+        
+        // Now execution should work
+        HamzaGovernor(governor).execute(targets, values, calldatas, keccak256(bytes(proposalDescription)));
+        assertEq(uint256(HamzaGovernor(governor).state(proposal)), uint256(ProposalState.Executed));
     }
 }

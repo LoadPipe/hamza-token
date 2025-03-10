@@ -243,7 +243,7 @@ contract DeployHamzaVault is Script {
         bytes[] memory initActions = prepareBaalInitActions(pauseSharesOnInit, pauseLootOnInit, sharesToMintForSafe, vault);
 
         // 8) Summon Baal
-        newBaalAddr = summoner.summonBaal(initParams, initActions, uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty))) % 100);
+        newBaalAddr = summoner.summonBaal(initParams, initActions, uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao))) % 100);
 
         // fetch loot token address (Baal's "loot token")
         lootTokenAddr = address(Baal(newBaalAddr).lootToken());
