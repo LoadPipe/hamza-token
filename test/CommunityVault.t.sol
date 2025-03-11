@@ -30,9 +30,6 @@ contract TestCommunityVault is DeploymentSetup {
     address internal depositor3;
     address internal recipient3;
 
-    address[] internal recipients;
-    uint256[] internal amounts;
-
     uint256 internal constant INITIAL_USER_BALANCE = 100_000_000_000 ether;
     IERC20 internal loot;
 
@@ -156,8 +153,6 @@ contract TestCommunityVault is DeploymentSetup {
         //check balances
         assertEq(loot.balanceOf(depositor2), (initialDepositor2Balance - depositAmount3));
         assertEq(loot.balanceOf(address(vault)), (initialVaultBalance + depositAmount1 + depositAmount2 + depositAmount3));
-        //assertEq(vault.getBalance(address(loot)), 1); //loot.balanceOf(address(vault))); 3300
-        //assertEq(loot.balanceOf(address(vault)), 1); //loot.balanceOf(address(vault))); 50000000000000003300
     }
     
     // Test that deposit transfers ETH in the correct way
@@ -178,23 +173,23 @@ contract TestCommunityVault is DeploymentSetup {
         deposit(depositor1, IERC20(address(0)), depositAmount1);
 
         //check balances
-        assertApproxEqRel(depositor1.balance, (initialDepositor1Balance - depositAmount1), 0.1e16);
-        assertApproxEqRel(address(vault).balance, (initialVaultBalance + depositAmount1), 0.1e16);
+        assertEq(depositor1.balance, (initialDepositor1Balance - depositAmount1));
+        assertEq(address(vault).balance, (initialVaultBalance + depositAmount1));
 
         //second deposit 
         deposit(depositor1, IERC20(address(0)), depositAmount2);
 
         //check balances
-        assertApproxEqRel(depositor1.balance, (initialDepositor1Balance - depositAmount1 - depositAmount2), 0.1e16);
-        assertApproxEqRel(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2), 0.1e16);
+        assertEq(depositor1.balance, (initialDepositor1Balance - depositAmount1 - depositAmount2));
+        assertEq(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2));
 
         //third deposit 
         deposit(depositor2, IERC20(address(0)), depositAmount3);
 
         //check balances
-        assertApproxEqRel(depositor2.balance, (initialDepositor2Balance - depositAmount3), 0.1e16);
-        assertApproxEqRel(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2 + depositAmount3), 0.1e16);
-        assertApproxEqRel(vault.getBalance(address(0)), address(vault).balance, 0.1e16);
+        assertEq(depositor2.balance, (initialDepositor2Balance - depositAmount3));
+        assertEq(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2 + depositAmount3)); //, 0.1e16);
+        assertEq(vault.getBalance(address(0)), address(vault).balance);
     }
     
     // Test that deposit behaves correctly when balance too low 
@@ -243,8 +238,10 @@ contract TestCommunityVault is DeploymentSetup {
         uint256 depositAmount = 100;
         deposit(depositor1, IERC20(loot), depositAmount);
 
-        recipients.push(recipient1);
-        amounts.push(50);
+        address[] memory recipients = new address[](1);
+        uint256[] memory amounts = new uint256[](1);
+        recipients[0] = recipient;
+        amounts[0] = 50;
 
         vm.expectRevert();
         vault.distribute(address(loot), recipients, amounts);
@@ -255,9 +252,11 @@ contract TestCommunityVault is DeploymentSetup {
         uint256 depositAmount = 100;
         deposit(depositor1, IERC20(loot), depositAmount);
 
-        recipients.push(recipient1);
-        amounts.push(50);
-        amounts.push(10);
+        address[] memory recipients = new address[](1);
+        uint256[] memory amounts = new uint256[](2);
+        recipients[0] = recipient1;
+        amounts[0] = 50;
+        amounts[1] = 10;
 
         vm.startPrank(admin);
         vm.expectRevert("Mismatched arrays");
@@ -288,9 +287,10 @@ contract TestCommunityVault is DeploymentSetup {
         deposit(depositor2, IERC20(address(0)), depositLootAmount3);
 
         //prepare to distribute 
-        recipients.push(recipient1);
-        recipients.push(recipient2);
-        recipients.push(recipient3);
+        address[] memory recipients = new address[](3);
+        recipients[0] = recipient1;
+        recipients[1] = recipient2;
+        recipients[2] = recipient3;
 
         //prepare loot amounts to distribute 
         uint256 distributeLootAmount1 = (depositLootTotal/3)-1;
@@ -302,9 +302,10 @@ contract TestCommunityVault is DeploymentSetup {
         uint256 distributeEthAmount2 = (depositEthTotal/10);
         uint256 distributeEthAmount3 = (depositEthTotal/10);
 
-        amounts.push(distributeLootAmount1);
-        amounts.push(distributeLootAmount2);
-        amounts.push(distributeLootAmount3);
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = distributeLootAmount1;
+        amounts[1] = distributeLootAmount2;
+        amounts[2] = distributeLootAmount3;
 
         //distribute loot 
         vm.prank(admin);
@@ -328,9 +329,11 @@ contract TestCommunityVault is DeploymentSetup {
     function testDistributeEmitsEvent() public {
         uint256 depositAmount = 100;
         deposit(depositor1, IERC20(loot), depositAmount);
-
-        recipients.push(recipient1);
-        amounts.push(50);
+        
+        address[] memory recipients = new address[](1);
+        uint256[] memory amounts = new uint256[](1);
+        recipients[0] = recipient1;
+        amounts[0] = 50;
 
         vm.startPrank(admin);
         vm.expectEmit(false, false, false, false);
@@ -405,6 +408,118 @@ contract TestCommunityVault is DeploymentSetup {
         vm.stopPrank();
     }
 
+
+    function testDistributeRewardsForBuyer() public {
+        bytes32 paymentId = keccak256("payment-reward-test-1");
+        uint256 payAmount = 500;
+
+        address payer = depositor1;
+        address seller = recipient1;
+
+        PaymentEscrow payEscrow = PaymentEscrow(payable(escrow));
+
+        // Buyer makes a purchase
+        vm.startPrank(payer);
+        loot.approve(address(payEscrow), payAmount);
+
+        PaymentInput memory input = PaymentInput({
+            id: paymentId,
+            payer: payer,
+            receiver: seller,
+            currency: address(loot),
+            amount: payAmount
+        });
+        payEscrow.placePayment(input);
+        vm.stopPrank();
+
+        // Buyer and seller release escrow
+        vm.prank(depositor1);
+        payEscrow.releaseEscrow(paymentId);
+
+        if (!autoRelease) {
+            vm.prank(seller);
+            payEscrow.releaseEscrow(paymentId);
+        }
+
+        // Validate purchase tracking
+        assertEq(tracker.totalPurchaseCount(payer), 1, "Incorrect purchase count");
+        assertEq(tracker.totalSalesCount(seller), 1, "Incorrect sales count");
+
+        // Check initial reward balance
+        uint256 initialBuyerBalance = loot.balanceOf(payer);
+        uint256 rewardsToDistribute = tracker.totalPurchaseCount(payer);
+
+        // Distribute reward
+        vm.prank(admin);
+        address[] memory recipients = new address[](1);
+        recipients[0] = payer;
+        CommunityVault(communityVault).distributeRewards(address(loot), recipients);
+
+        // Verify rewards were distributed
+        assertEq(loot.balanceOf(payer), initialBuyerBalance + rewardsToDistribute, "Incorrect reward distribution");
+        //assertEq(CommunityVault(communityVault).rewardsDistributed(payer), rewardsToDistribute, "Incorrect rewards tracked");
+    }
+
+    function testDistributeRewardsForSeller() public {
+        bytes32 paymentId = keccak256("payment-reward-test-2");
+        uint256 payAmount = 750;
+
+        address payer = depositor1;
+        address seller = recipient1;
+
+        PaymentEscrow payEscrow = PaymentEscrow(payable(escrow));
+
+        // Buyer makes a purchase
+        vm.startPrank(payer);
+        loot.approve(address(payEscrow), payAmount);
+
+        PaymentInput memory input = PaymentInput({
+            id: paymentId,
+            payer: payer,
+            receiver: seller,
+            currency: address(loot),
+            amount: payAmount
+        });
+        payEscrow.placePayment(input);
+        vm.stopPrank();
+
+        // Buyer and seller release escrow
+        vm.prank(payer);
+        payEscrow.releaseEscrow(paymentId);
+
+        if (!autoRelease) {
+            vm.prank(seller);
+            payEscrow.releaseEscrow(paymentId);
+        }
+
+        // Validate purchase tracking
+        assertEq(tracker.totalSalesCount(seller), 1, "Incorrect sales count");
+
+        // Check initial reward balance
+        uint256 initialSellerBalance = loot.balanceOf(seller);
+        uint256 rewardsToDistribute = tracker.totalSalesCount(seller);
+
+        // Distribute rewards
+        vm.prank(admin);
+        address[] memory recipients = new address[](1);
+        recipients[0] = seller;
+        CommunityVault(communityVault).distributeRewards(address(loot), recipients);
+
+        // Verify rewards were distributed
+        assertEq(loot.balanceOf(seller), initialSellerBalance + rewardsToDistribute, "Incorrect reward distribution");
+        //assertEq(tracker.rewardsDistributed(seller), rewardsToDistribute, "Incorrect rewards tracked");
+    }
+
+    /*function testDistributeRewardsFailsIfNoPurchasesOrSales() public {
+        // Check initial reward distribution
+        assertEq(tracker.rewardsDistributed(arbiter), 0, "Arbiter should have no rewards");
+
+        // Expect revert due to no rewards available
+        vm.expectRevert("PurchaseTracker: No rewards to distribute");
+        vm.prank(arbiter);
+        tracker.distributeReward(arbiter);
+    }*/
+
     function deposit(address _depositor, IERC20 token, uint256 amount) private {
         vm.startPrank(_depositor); 
         if (address(token) != address(0)) {
@@ -413,7 +528,7 @@ contract TestCommunityVault is DeploymentSetup {
         }
         else {
             address(vault).call{value: amount}(
-                abi.encodeWithSignature("deposit((address,uint256))", address(token), amount)
+                abi.encodeWithSignature("deposit(address,uint256)", address(token), amount)
             );
         }
 

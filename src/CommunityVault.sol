@@ -5,7 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@hamza-escrow/security/HasSecurityContext.sol";
 import "@hamza-escrow/security/Roles.sol";
 import "@hamza-escrow/security/ISecurityContext.sol";
-import "./GovernanceVault.sol";      
+import "./GovernanceVault.sol";
+import "./CommunityRewardsCalculator.sol";
 
 /**
  * @title CommunityVault
@@ -17,11 +18,17 @@ contract CommunityVault is HasSecurityContext {
     // Mapping to store token balances held in the community vault
     mapping(address => uint256) public tokenBalances;
 
+    // Keeps a count of already distributed rewards
+    mapping(address => mapping(address => uint256)) public rewardsDistributed;
+
     // Governance staking contract address
     address public governanceVault;
 
     // Address for purchase tracker 
     address public purchaseTracker;
+
+    // Address for rewards calculator 
+    ICommunityRewardsCalculator public rewardsCalculator;
 
     // Events
     event Deposit(address indexed token, address indexed from, uint256 amount);
@@ -105,38 +112,35 @@ contract CommunityVault is HasSecurityContext {
                 IERC20(token).safeTransfer(recipients[i], amounts[i]);
             }
 
+            // decrement balance 
             tokenBalances[token] -= amounts[i];
+
+            // record the distribution
+            rewardsDistributed[token][recipients[i]] += amounts[i];
 
             emit Distribute(token, recipients[i], amounts[i]);
         }
+    }
 
+    function distributeRewards(address token, address[] memory recipients) external onlyRole(Roles.SYSTEM_ROLE) {
+        if (address(rewardsCalculator) != address(0) && address(purchaseTracker) != address(0)) {
 
-        /*
+            //get rewards to distribute
+            uint256[] memory amounts = rewardsCalculator.getRewardsToDistribute(
+                token, recipients, IPurchaseTracker(purchaseTracker)
+            );
 
-        // for every purchase or sale made by the recipient, distribute 1 loot token
-        uint256 totalPurchase = totalPurchaseCount[recipient];
-        uint256 totalSales = totalSalesCount[recipient];
-        uint256 rewardsDist = rewardsDistributed[recipient];
-
-        uint256 totalRewards = totalPurchase + totalSales - rewardsDist;
-
-        require(totalRewards > 0, "PurchaseTracker: No rewards to distribute");
-
-        // transfer loot token from community vault to recipient
-        lootToken.safeTransferFrom(communityVault, recipient, totalRewards);
-
-        rewardsDistributed[recipient] += totalRewards;
-        */
+            this.distribute(token, recipients, amounts);
+        }
     }
 
     /**
-    * @dev Set the governance vault address and grant it unlimited allowance for `lootToken`.
-    *      Must be called by an admin role or similar.
-    * @param vault The address of the governance vault
-    * @param lootToken The address of the ERC20 token for which you'd like to grant unlimited allowance
-    */
-    function setGovernanceVault(address vault, address lootToken) external onlyRole(Roles.SYSTEM_ROLE) 
-    {
+     * @dev Set the governance vault address and grant it unlimited allowance for `lootToken`.
+     *      Must be called by an admin role or similar.
+     * @param vault The address of the governance vault
+     * @param lootToken The address of the ERC20 token for which you'd like to grant unlimited allowance
+     */
+    function setGovernanceVault(address vault, address lootToken) external onlyRole(Roles.SYSTEM_ROLE)  {
         require(vault != address(0), "Invalid staking contract address");
         require(lootToken != address(0), "Invalid loot token address");
 
@@ -154,6 +158,10 @@ contract CommunityVault is HasSecurityContext {
         require(_purchaseTracker != address(0), "Invalid purchase tracker address");
         
         purchaseTracker = _purchaseTracker;
+    }
+
+    function setCommunityRewardsCalculator(ICommunityRewardsCalculator calculator) external onlyRole(Roles.SYSTEM_ROLE) {
+        rewardsCalculator = calculator;
     }
 
     /**

@@ -4,13 +4,14 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@hamza-escrow/security/HasSecurityContext.sol";
+import "@hamza-escrow/IPurchaseTracker.sol";
 
 /**
  * @title PurchaseTracker
  * @notice A singleton contract that records purchase data.
  *
  */
-contract PurchaseTracker is HasSecurityContext {
+contract PurchaseTracker is HasSecurityContext, IPurchaseTracker {
     using SafeERC20 for IERC20;
 
     // Mapping from buyer address to cumulative purchase count and total purchase amount.
@@ -90,19 +91,19 @@ contract PurchaseTracker is HasSecurityContext {
         emit PurchaseRecorded(paymentId, buyer, amount);
     }
 
-    function getPurchaseCount(address recipient) public view returns (uint256) {
+    function getPurchaseCount(address recipient) external view returns (uint256) {
         return totalPurchaseCount[recipient];
     }
 
-    function getPurchaseAmount(address recipient) public view returns (uint256) {
+    function getPurchaseAmount(address recipient) external view returns (uint256) {
         return totalPurchaseAmount[recipient];
     }
 
-    function getSalesCount(address recipient) public view returns (uint256) {
+    function getSalesCount(address recipient) external view returns (uint256) {
         return totalSalesCount[recipient];
     }
 
-    function getSalesAmount(address recipient) public view returns (uint256) {
+    function getSalesAmount(address recipient) external view returns (uint256) {
         return totalSalesAmount[recipient];
     }
 }
