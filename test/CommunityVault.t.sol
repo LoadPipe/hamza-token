@@ -59,7 +59,9 @@ contract TestCommunityVault is DeploymentSetup {
         recipient = recipient1;
 
         // Fund the depositor with both ETH and ERC20 tokens
-        vm.deal(depositor, INITIAL_USER_BALANCE);
+        vm.deal(depositor1, INITIAL_USER_BALANCE);
+        vm.deal(depositor2, INITIAL_USER_BALANCE);
+        vm.deal(depositor3, INITIAL_USER_BALANCE);
         deal(address(loot), depositor1, INITIAL_USER_BALANCE);
         deal(address(loot), depositor2, INITIAL_USER_BALANCE);
         deal(address(loot), depositor3, INITIAL_USER_BALANCE);
@@ -154,16 +156,50 @@ contract TestCommunityVault is DeploymentSetup {
         //check balances
         assertEq(loot.balanceOf(depositor2), (initialDepositor2Balance - depositAmount3));
         assertEq(loot.balanceOf(address(vault)), (initialVaultBalance + depositAmount1 + depositAmount2 + depositAmount3));
+        //assertEq(vault.getBalance(address(loot)), 1); //loot.balanceOf(address(vault))); 3300
+        //assertEq(loot.balanceOf(address(vault)), 1); //loot.balanceOf(address(vault))); 50000000000000003300
     }
     
     // Test that deposit transfers ETH in the correct way
     function testDepositTransfersEth() public {
-        
+        uint256 depositAmount1 = 1000;
+        uint256 depositAmount2 = 1100;
+        uint256 depositAmount3 = 1200;
+
+        //initial balances
+        uint256 initialDepositor1Balance = depositor1.balance;
+        uint256 initialDepositor2Balance = depositor2.balance;
+        uint256 initialVaultBalance = address(vault).balance;
+
+        assertNotEq(initialDepositor1Balance, 0);
+        assertNotEq(initialDepositor2Balance, 0);
+
+        //first deposit 
+        deposit(depositor1, IERC20(address(0)), depositAmount1);
+
+        //check balances
+        assertEq(depositor1.balance, (initialDepositor1Balance - depositAmount1));
+        assertEq(address(vault).balance, (initialVaultBalance + depositAmount1));
+
+        //second deposit 
+        deposit(depositor1, IERC20(address(0)), depositAmount2);
+
+        //check balances
+        assertEq(depositor1.balance, (initialDepositor1Balance - depositAmount1 - depositAmount2));
+        assertEq(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2));
+
+        //third deposit 
+        deposit(depositor2, IERC20(address(0)), depositAmount3);
+
+        //check balances
+        assertEq(depositor2.balance, (initialDepositor2Balance - depositAmount3));
+        assertEq(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2 + depositAmount3));
+        assertEq(vault.getBalance(address(0)), address(vault).balance);
     }
     
     // Test that deposit behaves correctly when balance too low 
     function testDepositOverLimit() public {
-
+        //TODO: testDepositOverLimit
     }
     
     // Test that withdraw Insufficient Balance error 
@@ -180,17 +216,17 @@ contract TestCommunityVault is DeploymentSetup {
     
     // Test that withdraw transfers token correctly
     function testWithdrawTransfersTokens() public {
-
+        //TODO: testWithdrawTransfersTokens
     }
     
     // Test that withdraw emits Withdraw event
     function testWithdrawEmitsEvent() public {
-
+        //TODO: testWithdrawEmitsEvent
     }
     
     // Test that withdraw behaves correctly when balance too low 
     function testWithdrawOverLimit() public {
-
+        //TODO: testWithdrawOverLimit
     }
     
     // Test that withdraw is only callable if authorized
@@ -230,13 +266,62 @@ contract TestCommunityVault is DeploymentSetup {
     }
     
     // Test that distribute adjusts balances & distributes token correctly 
+    //TODO: finish testDistributeRewards 
     function testDistributeRewards() public {
+        uint256 depositLootAmount1 = 1000;
+        uint256 depositLootAmount2 = 1100;
+        uint256 depositLootAmount3 = 1200;
+        uint256 depositLootTotal = depositLootAmount1+depositLootAmount2+depositLootAmount3;
+        uint256 depositEthAmount1 = 3000;
+        uint256 depositEthAmount2 = 2100;
+        uint256 depositEthAmount3 = 4200;
+        uint256 depositEthTotal = depositEthAmount1+depositEthAmount2+depositEthAmount3;
 
+        //deposit loot
+        deposit(depositor1, IERC20(loot), depositLootAmount1);
+        deposit(depositor1, IERC20(loot), depositLootAmount2);
+        deposit(depositor2, IERC20(loot), depositLootAmount3);
+
+        //deposit eth
+        deposit(depositor1, IERC20(address(0)), depositLootAmount1);
+        deposit(depositor1, IERC20(address(0)), depositLootAmount2);
+        deposit(depositor2, IERC20(address(0)), depositLootAmount3);
+
+        //prepare to distribute 
+        recipients.push(recipient1);
+        recipients.push(recipient2);
+        recipients.push(recipient3);
+
+        //prepare loot amounts to distribute 
+        uint256 distributeLootAmount1 = (depositLootTotal/3)-1;
+        uint256 distributeLootAmount2 = (depositLootTotal/3)-2;
+        uint256 distributeLootAmount3 = (depositLootTotal/3)-3;
+
+        //prepare eth amounts to distribute 
+        uint256 distributeEthAmount1 = (depositEthTotal/3)-1;
+        uint256 distributeEthAmount2 = (depositEthTotal/3)-2;
+        uint256 distributeEthAmount3 = (depositEthTotal/3)-3;
+
+        amounts.push(distributeLootAmount1);
+        amounts.push(distributeLootAmount2);
+        amounts.push(distributeLootAmount3);
+
+        //distribute loot 
+        vm.prank(admin);
+        vault.distribute(address(loot), recipients, amounts);
+
+        amounts[0] = distributeEthAmount1;
+        amounts[1] = distributeEthAmount2;
+        amounts[2] = distributeEthAmount3;
+
+        //distribute eth 
+        vm.prank(admin);
+        vault.distribute(address(0), recipients, amounts);
     }
     
     // Test that distribute handles insufficient balances correctly
     function testDistributeInsufficientBalance() public {
-
+        //TODO: testDistributeInsufficientBalance
     }
     
     // Test that distribute emits Distribute event 
@@ -327,8 +412,16 @@ contract TestCommunityVault is DeploymentSetup {
 
     function deposit(address _depositor, IERC20 token, uint256 amount) private {
         vm.startPrank(_depositor); 
-        token.approve(address(vault), amount); 
-        vault.deposit(address(token), amount);
+        if (address(token) != address(0)) {
+            token.approve(address(vault), amount); 
+            vault.deposit(address(token), amount);
+        }
+        else {
+            address(vault).call{value: amount}(
+                abi.encodeWithSignature("deposit((address,uint256))", address(token), amount)
+            );
+        }
+
         vm.stopPrank();
     }
 }

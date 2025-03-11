@@ -97,7 +97,8 @@ contract PurchaseTracker is HasSecurityContext {
         emit PurchaseRecorded(paymentId, buyer, amount);
     }
     
-    // distrubte reward from communtiy vault
+    // distribute reward from communtiy vault
+    //TODO: responsibility should be transferred to CommunityVault? 
     function distributeReward(address recipient) external {
         // for every purchase or sale made by the recipient, distribute 1 loot token
         uint256 totalPurchase = totalPurchaseCount[recipient];
@@ -113,6 +114,4 @@ contract PurchaseTracker is HasSecurityContext {
 
         rewardsDistributed[recipient] += totalRewards;
     }
-
-   
 }
