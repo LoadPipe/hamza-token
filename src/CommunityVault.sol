@@ -109,6 +109,24 @@ contract CommunityVault is HasSecurityContext {
 
             emit Distribute(token, recipients[i], amounts[i]);
         }
+
+
+        /*
+
+        // for every purchase or sale made by the recipient, distribute 1 loot token
+        uint256 totalPurchase = totalPurchaseCount[recipient];
+        uint256 totalSales = totalSalesCount[recipient];
+        uint256 rewardsDist = rewardsDistributed[recipient];
+
+        uint256 totalRewards = totalPurchase + totalSales - rewardsDist;
+
+        require(totalRewards > 0, "PurchaseTracker: No rewards to distribute");
+
+        // transfer loot token from community vault to recipient
+        lootToken.safeTransferFrom(communityVault, recipient, totalRewards);
+
+        rewardsDistributed[recipient] += totalRewards;
+        */
     }
 
     /**

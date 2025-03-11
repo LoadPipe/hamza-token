@@ -27,9 +27,6 @@ contract PurchaseTracker is HasSecurityContext {
     // Store details about each purchase (keyed by the unique payment ID).
     mapping(bytes32 => Purchase) public purchases;
 
-    //Comunity Vault address
-    address public communityVault;
-
     // loot token 
     IERC20 public lootToken;
     
@@ -50,8 +47,7 @@ contract PurchaseTracker is HasSecurityContext {
         _;
     }
     
-    constructor(ISecurityContext securityContext, address _communityVault, address _lootToken) {
-        communityVault = _communityVault;
+    constructor(ISecurityContext securityContext, address _lootToken) {
         lootToken = IERC20(_lootToken);
         _setSecurityContext(securityContext);
     }
@@ -95,23 +91,5 @@ contract PurchaseTracker is HasSecurityContext {
         totalSalesAmount[seller] += amount;
         
         emit PurchaseRecorded(paymentId, buyer, amount);
-    }
-    
-    // distribute reward from communtiy vault
-    //TODO: responsibility should be transferred to CommunityVault? 
-    function distributeReward(address recipient) external {
-        // for every purchase or sale made by the recipient, distribute 1 loot token
-        uint256 totalPurchase = totalPurchaseCount[recipient];
-        uint256 totalSales = totalSalesCount[recipient];
-        uint256 rewardsDist = rewardsDistributed[recipient];
-
-        uint256 totalRewards = totalPurchase + totalSales - rewardsDist;
-
-        require(totalRewards > 0, "PurchaseTracker: No rewards to distribute");
-
-        // transfer loot token from community vault to recipient
-        lootToken.safeTransferFrom(communityVault, recipient, totalRewards);
-
-        rewardsDistributed[recipient] += totalRewards;
     }
 }

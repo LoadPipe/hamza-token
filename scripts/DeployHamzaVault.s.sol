@@ -412,7 +412,7 @@ contract DeployHamzaVault is Script {
         bool autoRelease = config.readBool(".escrow.autoRelease");
         
         // 15) Deploy PurchaseTracker
-        PurchaseTracker purchaseTracker = new PurchaseTracker(securityContext, vault, lootTokenAddr);
+        PurchaseTracker purchaseTracker = new PurchaseTracker(securityContext, lootTokenAddr);
 
         //setPurchaseTracker in community vault
         CommunityVault(vault).setPurchaseTracker(address(purchaseTracker), lootTokenAddr);

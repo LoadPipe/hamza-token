@@ -385,7 +385,7 @@ contract TestCommunityVault is DeploymentSetup {
     // Test that setPurchaseTracker sets the PurchaseTracker
     function testSetPurchaseTracker() public {
         PurchaseTracker newTracker = new PurchaseTracker(
-            ISecurityContext(hatsCtx), address(vault), address(testToken)
+            ISecurityContext(hatsCtx), address(testToken)
         );
 
         vm.prank(admin);
