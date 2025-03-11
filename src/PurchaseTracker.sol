@@ -20,9 +20,6 @@ contract PurchaseTracker is HasSecurityContext {
     // mapping for sellers 
     mapping(address => uint256) public totalSalesCount;
     mapping(address => uint256) public totalSalesAmount;
-
-    // mapping rewards distributed
-    mapping(address => uint256) public rewardsDistributed;
     
     // Store details about each purchase (keyed by the unique payment ID).
     mapping(bytes32 => Purchase) public purchases;
@@ -91,5 +88,21 @@ contract PurchaseTracker is HasSecurityContext {
         totalSalesAmount[seller] += amount;
         
         emit PurchaseRecorded(paymentId, buyer, amount);
+    }
+
+    function getPurchaseCount(address recipient) public view returns (uint256) {
+        return totalPurchaseCount[recipient];
+    }
+
+    function getPurchaseAmount(address recipient) public view returns (uint256) {
+        return totalPurchaseAmount[recipient];
+    }
+
+    function getSalesCount(address recipient) public view returns (uint256) {
+        return totalSalesCount[recipient];
+    }
+
+    function getSalesAmount(address recipient) public view returns (uint256) {
+        return totalSalesAmount[recipient];
     }
 }

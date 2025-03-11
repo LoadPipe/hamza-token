@@ -415,7 +415,7 @@ contract DeployHamzaVault is Script {
         PurchaseTracker purchaseTracker = new PurchaseTracker(securityContext, lootTokenAddr);
 
         //setPurchaseTracker in community vault
-        CommunityVault(vault).setPurchaseTracker(address(purchaseTracker), lootTokenAddr);
+        CommunityVault(vault).setPurchaseTracker(address(purchaseTracker));
 
         purchaseTrackerAddr = address(purchaseTracker);
 

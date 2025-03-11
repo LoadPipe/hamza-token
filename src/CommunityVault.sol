@@ -147,15 +147,13 @@ contract CommunityVault is HasSecurityContext {
         IERC20(lootToken).safeApprove(vault, type(uint256).max);
     }
 
-    function setPurchaseTracker(address _purchaseTracker, address lootToken) external onlyRole(Roles.SYSTEM_ROLE) {
+    /**
+     * @dev Sets the purchase tracker that is used to keep track of who has done what, in order to get rewards. 
+     */
+    function setPurchaseTracker(address _purchaseTracker) external onlyRole(Roles.SYSTEM_ROLE) {
         require(_purchaseTracker != address(0), "Invalid purchase tracker address");
-        require(lootToken != address(0), "Invalid loot token address");
         
         purchaseTracker = _purchaseTracker;
-
-        // Grant unlimited allowance to the purchase tracker
-        IERC20(lootToken).safeApprove(_purchaseTracker, 0);
-        IERC20(lootToken).safeApprove(_purchaseTracker, type(uint256).max);
     }
 
     /**

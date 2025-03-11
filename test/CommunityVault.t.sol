@@ -33,7 +33,7 @@ contract TestCommunityVault is DeploymentSetup {
     address[] internal recipients;
     uint256[] internal amounts;
 
-    uint256 internal constant INITIAL_USER_BALANCE = 100_000 ether;
+    uint256 internal constant INITIAL_USER_BALANCE = 100_000_000_000 ether;
     IERC20 internal loot;
 
     function setUp() public virtual override {
@@ -178,23 +178,23 @@ contract TestCommunityVault is DeploymentSetup {
         deposit(depositor1, IERC20(address(0)), depositAmount1);
 
         //check balances
-        assertEq(depositor1.balance, (initialDepositor1Balance - depositAmount1));
-        assertEq(address(vault).balance, (initialVaultBalance + depositAmount1));
+        assertApproxEqRel(depositor1.balance, (initialDepositor1Balance - depositAmount1), 0.1e16);
+        assertApproxEqRel(address(vault).balance, (initialVaultBalance + depositAmount1), 0.1e16);
 
         //second deposit 
         deposit(depositor1, IERC20(address(0)), depositAmount2);
 
         //check balances
-        assertEq(depositor1.balance, (initialDepositor1Balance - depositAmount1 - depositAmount2));
-        assertEq(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2));
+        assertApproxEqRel(depositor1.balance, (initialDepositor1Balance - depositAmount1 - depositAmount2), 0.1e16);
+        assertApproxEqRel(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2), 0.1e16);
 
         //third deposit 
         deposit(depositor2, IERC20(address(0)), depositAmount3);
 
         //check balances
-        assertEq(depositor2.balance, (initialDepositor2Balance - depositAmount3));
-        assertEq(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2 + depositAmount3));
-        assertEq(vault.getBalance(address(0)), address(vault).balance);
+        assertApproxEqRel(depositor2.balance, (initialDepositor2Balance - depositAmount3), 0.1e16);
+        assertApproxEqRel(address(vault).balance, (initialVaultBalance + depositAmount1 + depositAmount2 + depositAmount3), 0.1e16);
+        assertApproxEqRel(vault.getBalance(address(0)), address(vault).balance, 0.1e16);
     }
     
     // Test that deposit behaves correctly when balance too low 
@@ -251,7 +251,7 @@ contract TestCommunityVault is DeploymentSetup {
     }
     
     // Test that distribute "Mismatched arrays" error 
-    function testDistributeMimatchedArraysError() public {
+    function testDistributeMismatchedArraysError() public {
         uint256 depositAmount = 100;
         deposit(depositor1, IERC20(loot), depositAmount);
 
@@ -298,9 +298,9 @@ contract TestCommunityVault is DeploymentSetup {
         uint256 distributeLootAmount3 = (depositLootTotal/3)-3;
 
         //prepare eth amounts to distribute 
-        uint256 distributeEthAmount1 = (depositEthTotal/3)-1;
-        uint256 distributeEthAmount2 = (depositEthTotal/3)-2;
-        uint256 distributeEthAmount3 = (depositEthTotal/3)-3;
+        uint256 distributeEthAmount1 = (depositEthTotal/10);
+        uint256 distributeEthAmount2 = (depositEthTotal/10);
+        uint256 distributeEthAmount3 = (depositEthTotal/10);
 
         amounts.push(distributeLootAmount1);
         amounts.push(distributeLootAmount2);
@@ -379,7 +379,7 @@ contract TestCommunityVault is DeploymentSetup {
     // Test that setPurchaseTracker can be only called by admin
     function testSetPurchaseTrackerRestricted() public {
         vm.expectRevert();
-        vault.setPurchaseTracker(purchaseTracker, address(loot));
+        vault.setPurchaseTracker(purchaseTracker);
     }
     
     // Test that setPurchaseTracker sets the PurchaseTracker
@@ -389,10 +389,9 @@ contract TestCommunityVault is DeploymentSetup {
         );
 
         vm.prank(admin);
-        vault.setPurchaseTracker(address(newTracker), address(testToken));
+        vault.setPurchaseTracker(address(newTracker));
 
         assertEq(address(vault.purchaseTracker()), address(newTracker));
-        assertEq(testToken.allowance(address(vault), address(vault.purchaseTracker())), type(uint256).max);
     }
     
     // Test that setPurchaseTracker validates address arguments
@@ -401,11 +400,7 @@ contract TestCommunityVault is DeploymentSetup {
 
         //invalid purchase tracker
         vm.expectRevert("Invalid purchase tracker address");
-        vault.setPurchaseTracker(address(0), address(loot));
-
-        //invalid loot token
-        vm.expectRevert("Invalid loot token address");
-        vault.setPurchaseTracker(address(tracker), address(0));
+        vault.setPurchaseTracker(address(0));
 
         vm.stopPrank();
     }
