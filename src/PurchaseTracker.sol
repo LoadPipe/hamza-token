@@ -4,13 +4,14 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@hamza-escrow/security/HasSecurityContext.sol";
+import "@hamza-escrow/IPurchaseTracker.sol";
 
 /**
  * @title PurchaseTracker
  * @notice A singleton contract that records purchase data.
  *
  */
-contract PurchaseTracker is HasSecurityContext {
+contract PurchaseTracker is HasSecurityContext, IPurchaseTracker {
     using SafeERC20 for IERC20;
 
     // Mapping from buyer address to cumulative purchase count and total purchase amount.
@@ -20,15 +21,9 @@ contract PurchaseTracker is HasSecurityContext {
     // mapping for sellers 
     mapping(address => uint256) public totalSalesCount;
     mapping(address => uint256) public totalSalesAmount;
-
-    // mapping rewards distributed
-    mapping(address => uint256) public rewardsDistributed;
     
     // Store details about each purchase (keyed by the unique payment ID).
     mapping(bytes32 => Purchase) public purchases;
-
-    //Comunity Vault address
-    address public communityVault;
 
     // loot token 
     IERC20 public lootToken;
@@ -50,8 +45,7 @@ contract PurchaseTracker is HasSecurityContext {
         _;
     }
     
-    constructor(ISecurityContext securityContext, address _communityVault, address _lootToken) {
-        communityVault = _communityVault;
+    constructor(ISecurityContext securityContext, address _lootToken) {
         lootToken = IERC20(_lootToken);
         _setSecurityContext(securityContext);
     }
@@ -96,23 +90,20 @@ contract PurchaseTracker is HasSecurityContext {
         
         emit PurchaseRecorded(paymentId, buyer, amount);
     }
-    
-    // distrubte reward from communtiy vault
-    function distributeReward(address recipient) external {
-        // for every purchase or sale made by the recipient, distribute 1 loot token
-        uint256 totalPurchase = totalPurchaseCount[recipient];
-        uint256 totalSales = totalSalesCount[recipient];
-        uint256 rewardsDist = rewardsDistributed[recipient];
 
-        uint256 totalRewards = totalPurchase + totalSales - rewardsDist;
-
-        require(totalRewards > 0, "PurchaseTracker: No rewards to distribute");
-
-        // transfer loot token from community vault to recipient
-        lootToken.safeTransferFrom(communityVault, recipient, totalRewards);
-
-        rewardsDistributed[recipient] += totalRewards;
+    function getPurchaseCount(address recipient) external view returns (uint256) {
+        return totalPurchaseCount[recipient];
     }
 
-   
+    function getPurchaseAmount(address recipient) external view returns (uint256) {
+        return totalPurchaseAmount[recipient];
+    }
+
+    function getSalesCount(address recipient) external view returns (uint256) {
+        return totalSalesCount[recipient];
+    }
+
+    function getSalesAmount(address recipient) external view returns (uint256) {
+        return totalSalesAmount[recipient];
+    }
 }

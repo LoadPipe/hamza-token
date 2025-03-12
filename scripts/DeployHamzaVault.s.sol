@@ -7,6 +7,7 @@ import "@baal/Baal.sol";
 import "@baal/BaalSummoner.sol";
 
 import "../src/CommunityVault.sol";
+import "../src/CommunityRewardsCalculator.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/GovernanceVault.sol";
 
@@ -211,6 +212,8 @@ contract DeployHamzaVault is Script {
         // 5) Deploy the Community Vault
         CommunityVault communityVault = new CommunityVault(hatsSecurityContextAddr);
         vault = payable(address(communityVault));
+        CommunityRewardsCalculator calculator = new CommunityRewardsCalculator();
+        communityVault.setCommunityRewardsCalculator(calculator);
 
         // 6) Summon the Baal DAO
         BaalSummoner summoner = BaalSummoner(BAAL_SUMMONER);
@@ -412,10 +415,10 @@ contract DeployHamzaVault is Script {
         bool autoRelease = config.readBool(".escrow.autoRelease");
         
         // 15) Deploy PurchaseTracker
-        PurchaseTracker purchaseTracker = new PurchaseTracker(securityContext, vault, lootTokenAddr);
+        PurchaseTracker purchaseTracker = new PurchaseTracker(securityContext, lootTokenAddr);
 
         //setPurchaseTracker in community vault
-        CommunityVault(vault).setPurchaseTracker(address(purchaseTracker), lootTokenAddr);
+        CommunityVault(vault).setPurchaseTracker(address(purchaseTracker));
 
         purchaseTrackerAddr = address(purchaseTracker);
 
@@ -438,7 +441,7 @@ contract DeployHamzaVault is Script {
     
     function logDeployedAddresses(
         address newBaalAddr,
-        address vault,
+        address communityVault,
         address govTokenAddr,
         address govVaultAddr,
         address timelockAddr
@@ -446,7 +449,7 @@ contract DeployHamzaVault is Script {
         console2.log("Owner One (from PRIVATE_KEY):", OWNER_ONE);
         console2.log("Owner Two (from config):     ", OWNER_TWO);
 
-        console2.log("CommunityVault deployed at:", vault);
+        console2.log("CommunityVault deployed at:", communityVault);
 
         console2.log("BaalSummoner at:", BAAL_SUMMONER);
         console2.log("Baal (Hamza Vault) deployed at:", newBaalAddr);

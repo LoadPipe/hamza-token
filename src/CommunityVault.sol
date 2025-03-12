@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@hamza-escrow/security/HasSecurityContext.sol";
 import "@hamza-escrow/security/Roles.sol";
 import "@hamza-escrow/security/ISecurityContext.sol";
-import "./GovernanceVault.sol";      
+import "./ICommunityRewardsCalculator.sol";
 
 /**
  * @title CommunityVault
@@ -17,11 +17,17 @@ contract CommunityVault is HasSecurityContext {
     // Mapping to store token balances held in the community vault
     mapping(address => uint256) public tokenBalances;
 
+    // Keeps a count of already distributed rewards
+    mapping(address => mapping(address => uint256)) public rewardsDistributed;
+
     // Governance staking contract address
     address public governanceVault;
 
     // Address for purchase tracker 
     address public purchaseTracker;
+
+    // Address for rewards calculator 
+    ICommunityRewardsCalculator public rewardsCalculator;
 
     // Events
     event Deposit(address indexed token, address indexed from, uint256 amount);
@@ -91,6 +97,87 @@ contract CommunityVault is HasSecurityContext {
         address[] calldata recipients,
         uint256[] calldata amounts
     ) external onlyRole(Roles.SYSTEM_ROLE) {
+        _distribute(token, recipients, amounts);
+    }
+
+    /**
+     * @dev Distribute tokens or ETH from the community vault to multiple recipients, using the 
+     *      CommunityRewardsCalculator to calculate the amounts to reward each recipient.
+     * @param token The address of the token 
+     * @param recipients The array of recipient addresses
+     */
+    function distributeRewards(address token, address[] memory recipients) external onlyRole(Roles.SYSTEM_ROLE) {
+        _distributeRewards(token, recipients);
+    }
+
+    /**
+     * @dev Allows a rightful recipient of rewards to claim rewards that have been allocated to them.
+     * @param token The address of the token 
+     */
+    function claimRewards(address token) external {
+        address[] memory recipients = new address[](1);
+        recipients[0] = msg.sender;
+        _distributeRewards(token, recipients);
+    }
+
+    /**
+     * @dev Set the governance vault address and grant it unlimited allowance for `lootToken`.
+     *      Must be called by an admin role or similar.
+     * @param vault The address of the governance vault
+     * @param lootToken The address of the ERC20 token for which you'd like to grant unlimited allowance
+     */
+    function setGovernanceVault(address vault, address lootToken) external onlyRole(Roles.SYSTEM_ROLE)  {
+        require(vault != address(0), "Invalid staking contract address");
+        require(lootToken != address(0), "Invalid loot token address");
+
+        governanceVault = vault;
+
+        // Grant unlimited allowance to the governance vault
+        IERC20(lootToken).safeApprove(vault, 0);
+        IERC20(lootToken).safeApprove(vault, type(uint256).max);
+    }
+
+    /**
+     * @dev Sets the purchase tracker that is used to keep track of who has done what, in order to get rewards. 
+     */
+    function setPurchaseTracker(address _purchaseTracker) external onlyRole(Roles.SYSTEM_ROLE) {
+        require(_purchaseTracker != address(0), "Invalid purchase tracker address");
+        
+        purchaseTracker = _purchaseTracker;
+    }
+
+    /**
+     * @dev Sets the address of the contract which holds the logic for calculating how to divide up rewards. 
+     */
+    function setCommunityRewardsCalculator(ICommunityRewardsCalculator calculator) external onlyRole(Roles.SYSTEM_ROLE) {
+        rewardsCalculator = calculator;
+    }
+
+    /**
+     * @dev Get the balance of a token in the community vault
+     * @param token The address of the token
+     */
+    function getBalance(address token) external view returns (uint256) {
+        return tokenBalances[token];
+    }
+
+    function _distributeRewards(address token, address[] memory recipients) internal {
+        if (address(rewardsCalculator) != address(0) && address(purchaseTracker) != address(0)) {
+
+            //get rewards to distribute
+            uint256[] memory amounts = rewardsCalculator.getRewardsToDistribute(
+                token, recipients, IPurchaseTracker(purchaseTracker)
+            );
+
+            _distribute(token, recipients, amounts);
+        }
+    }
+
+    function _distribute(
+        address token,
+        address[] memory recipients,
+        uint256[] memory amounts
+    ) internal {
         require(recipients.length == amounts.length, "Mismatched arrays");
 
         for (uint256 i = 0; i < recipients.length; i++) {
@@ -105,48 +192,14 @@ contract CommunityVault is HasSecurityContext {
                 IERC20(token).safeTransfer(recipients[i], amounts[i]);
             }
 
+            // decrement balance 
             tokenBalances[token] -= amounts[i];
+
+            // record the distribution
+            rewardsDistributed[token][recipients[i]] += amounts[i];
 
             emit Distribute(token, recipients[i], amounts[i]);
         }
-    }
-
-    /**
-    * @dev Set the governance vault address and grant it unlimited allowance for `lootToken`.
-    *      Must be called by an admin role or similar.
-    * @param vault The address of the governance vault
-    * @param lootToken The address of the ERC20 token for which you'd like to grant unlimited allowance
-    */
-    function setGovernanceVault(address vault, address lootToken)
-        external
-    {
-        require(vault != address(0), "Invalid staking contract address");
-        require(lootToken != address(0), "Invalid loot token address");
-
-        governanceVault = vault;
-
-        // Grant unlimited allowance to the governance vault
-        IERC20(lootToken).safeApprove(vault, 0);
-        IERC20(lootToken).safeApprove(vault, type(uint256).max);
-    }
-
-    function setPurchaseTracker(address _purchaseTracker, address lootToken) external {
-        require(_purchaseTracker != address(0), "Invalid purchase tracker address");
-        require(lootToken != address(0), "Invalid loot token address");
-        
-        purchaseTracker = _purchaseTracker;
-
-        // Grant unlimited allowance to the purchase tracker
-        IERC20(lootToken).safeApprove(_purchaseTracker, 0);
-        IERC20(lootToken).safeApprove(_purchaseTracker, type(uint256).max);
-    }
-
-    /**
-     * @dev Get the balance of a token in the community vault
-     * @param token The address of the token
-     */
-    function getBalance(address token) external view returns (uint256) {
-        return tokenBalances[token];
     }
 
     // Fallback to receive ETH
