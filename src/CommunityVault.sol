@@ -6,7 +6,7 @@ import "@hamza-escrow/security/HasSecurityContext.sol";
 import "@hamza-escrow/security/Roles.sol";
 import "@hamza-escrow/security/ISecurityContext.sol";
 import "./GovernanceVault.sol";
-import "./CommunityRewardsCalculator.sol";
+import "./ICommunityRewardsCalculator.sol";
 
 /**
  * @title CommunityVault
@@ -98,40 +98,27 @@ contract CommunityVault is HasSecurityContext {
         address[] calldata recipients,
         uint256[] calldata amounts
     ) external onlyRole(Roles.SYSTEM_ROLE) {
-        require(recipients.length == amounts.length, "Mismatched arrays");
-
-        for (uint256 i = 0; i < recipients.length; i++) {
-            require(tokenBalances[token] >= amounts[i], "Insufficient balance");
-
-            if (token == address(0)) {
-                // ETH distribution
-                (bool success, ) = recipients[i].call{value: amounts[i]}("");
-                require(success, "ETH transfer failed");
-            } else {
-                // ERC20 distribution
-                IERC20(token).safeTransfer(recipients[i], amounts[i]);
-            }
-
-            // decrement balance 
-            tokenBalances[token] -= amounts[i];
-
-            // record the distribution
-            rewardsDistributed[token][recipients[i]] += amounts[i];
-
-            emit Distribute(token, recipients[i], amounts[i]);
-        }
+        _distribute(token, recipients, amounts);
     }
 
+    /**
+     * @dev Distribute tokens or ETH from the community vault to multiple recipients, using the 
+     *      CommunityRewardsCalculator to calculate the amounts to reward each recipient.
+     * @param token The address of the token 
+     * @param recipients The array of recipient addresses
+     */
     function distributeRewards(address token, address[] memory recipients) external onlyRole(Roles.SYSTEM_ROLE) {
-        if (address(rewardsCalculator) != address(0) && address(purchaseTracker) != address(0)) {
+        _distributeRewards(token, recipients);
+    }
 
-            //get rewards to distribute
-            uint256[] memory amounts = rewardsCalculator.getRewardsToDistribute(
-                token, recipients, IPurchaseTracker(purchaseTracker)
-            );
-
-            this.distribute(token, recipients, amounts);
-        }
+    /**
+     * @dev Allows a rightful recipient of rewards to claim rewards that have been allocated to them.
+     * @param token The address of the token 
+     */
+    function claimRewards(address token) external {
+        address[] memory recipients = new address[](1);
+        recipients[0] = msg.sender;
+        _distributeRewards(token, recipients);
     }
 
     /**
@@ -160,6 +147,9 @@ contract CommunityVault is HasSecurityContext {
         purchaseTracker = _purchaseTracker;
     }
 
+    /**
+     * @dev Sets the address of the contract which holds the logic for calculating how to divide up rewards. 
+     */
     function setCommunityRewardsCalculator(ICommunityRewardsCalculator calculator) external onlyRole(Roles.SYSTEM_ROLE) {
         rewardsCalculator = calculator;
     }
@@ -170,6 +160,47 @@ contract CommunityVault is HasSecurityContext {
      */
     function getBalance(address token) external view returns (uint256) {
         return tokenBalances[token];
+    }
+
+    function _distributeRewards(address token, address[] memory recipients) internal {
+        if (address(rewardsCalculator) != address(0) && address(purchaseTracker) != address(0)) {
+
+            //get rewards to distribute
+            uint256[] memory amounts = rewardsCalculator.getRewardsToDistribute(
+                token, recipients, IPurchaseTracker(purchaseTracker)
+            );
+
+            _distribute(token, recipients, amounts);
+        }
+    }
+
+    function _distribute(
+        address token,
+        address[] memory recipients,
+        uint256[] memory amounts
+    ) internal {
+        require(recipients.length == amounts.length, "Mismatched arrays");
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            require(tokenBalances[token] >= amounts[i], "Insufficient balance");
+
+            if (token == address(0)) {
+                // ETH distribution
+                (bool success, ) = recipients[i].call{value: amounts[i]}("");
+                require(success, "ETH transfer failed");
+            } else {
+                // ERC20 distribution
+                IERC20(token).safeTransfer(recipients[i], amounts[i]);
+            }
+
+            // decrement balance 
+            tokenBalances[token] -= amounts[i];
+
+            // record the distribution
+            rewardsDistributed[token][recipients[i]] += amounts[i];
+
+            emit Distribute(token, recipients[i], amounts[i]);
+        }
     }
 
     // Fallback to receive ETH

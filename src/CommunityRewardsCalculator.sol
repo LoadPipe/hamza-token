@@ -2,14 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@hamza-escrow/IPurchaseTracker.sol";
-
-interface ICommunityRewardsCalculator {
-    function getRewardsToDistribute(
-        address token, 
-        address[] calldata recipients,
-        IPurchaseTracker purchaseTracker
-    ) external returns (uint256[] memory);
-}
+import "./ICommunityRewardsCalculator.sol";
 
 /**
  * @title CommunityRewardsCalculator

@@ -385,6 +385,23 @@ contract TestCommunityVault is DeploymentSetup {
         vault.setPurchaseTracker(purchaseTracker);
     }
     
+    // Test that setCommunityRewardsCalculator sets the CommunityRewardsCalculator
+    function testSetCommunityRewardsCalculator() public {
+        CommunityRewardsCalculator newCalc = new CommunityRewardsCalculator();
+
+        vm.prank(admin);
+        vault.setCommunityRewardsCalculator(ICommunityRewardsCalculator(newCalc));
+
+        assertEq(address(vault.rewardsCalculator()), address(newCalc));
+    }
+    
+    // Test that setPurchaseTracker can be only called by admin
+    function testSetCommunityRewardsCalculatorRestricted() public {
+        CommunityRewardsCalculator calc = new CommunityRewardsCalculator();
+        vm.expectRevert();
+        vault.setCommunityRewardsCalculator(calc);
+    }
+    
     // Test that setPurchaseTracker sets the PurchaseTracker
     function testSetPurchaseTracker() public {
         PurchaseTracker newTracker = new PurchaseTracker(
@@ -408,7 +425,7 @@ contract TestCommunityVault is DeploymentSetup {
         vm.stopPrank();
     }
 
-
+    // Test that rewards are distributed through the PurchaseTracker and CommunityRewardsCalculator to buyers
     function testDistributeRewardsForBuyer() public {
         bytes32 paymentId = keccak256("payment-reward-test-1");
         uint256 payAmount = 500;
@@ -417,6 +434,9 @@ contract TestCommunityVault is DeploymentSetup {
         address seller = recipient1;
 
         PaymentEscrow payEscrow = PaymentEscrow(payable(escrow));
+
+        //make sure there's enough in the vault to distribute
+        deposit(depositor2, loot, 100_000);
 
         // Buyer makes a purchase
         vm.startPrank(payer);
@@ -450,24 +470,29 @@ contract TestCommunityVault is DeploymentSetup {
         uint256 rewardsToDistribute = tracker.totalPurchaseCount(payer);
 
         // Distribute reward
-        vm.prank(admin);
         address[] memory recipients = new address[](1);
         recipients[0] = payer;
+
+        vm.prank(admin);
         CommunityVault(communityVault).distributeRewards(address(loot), recipients);
 
         // Verify rewards were distributed
         assertEq(loot.balanceOf(payer), initialBuyerBalance + rewardsToDistribute, "Incorrect reward distribution");
-        //assertEq(CommunityVault(communityVault).rewardsDistributed(payer), rewardsToDistribute, "Incorrect rewards tracked");
+        assertEq(vault.rewardsDistributed(address(loot), payer), rewardsToDistribute, "Incorrect rewards tracked");
     }
 
+    // Test that rewards are distributed through the PurchaseTracker and CommunityRewardsCalculator to sellers
     function testDistributeRewardsForSeller() public {
         bytes32 paymentId = keccak256("payment-reward-test-2");
-        uint256 payAmount = 750;
+        uint256 payAmount = 750_000_000_000_000;
 
         address payer = depositor1;
         address seller = recipient1;
 
         PaymentEscrow payEscrow = PaymentEscrow(payable(escrow));
+
+        //make sure there's enough in the vault to distribute
+        deposit(depositor2, loot, 100_000);
 
         // Buyer makes a purchase
         vm.startPrank(payer);
@@ -500,25 +525,16 @@ contract TestCommunityVault is DeploymentSetup {
         uint256 rewardsToDistribute = tracker.totalSalesCount(seller);
 
         // Distribute rewards
-        vm.prank(admin);
         address[] memory recipients = new address[](1);
         recipients[0] = seller;
+
+        vm.prank(admin);
         CommunityVault(communityVault).distributeRewards(address(loot), recipients);
 
         // Verify rewards were distributed
         assertEq(loot.balanceOf(seller), initialSellerBalance + rewardsToDistribute, "Incorrect reward distribution");
-        //assertEq(tracker.rewardsDistributed(seller), rewardsToDistribute, "Incorrect rewards tracked");
+        assertEq(vault.rewardsDistributed(address(loot), seller), rewardsToDistribute, "Incorrect rewards tracked");
     }
-
-    /*function testDistributeRewardsFailsIfNoPurchasesOrSales() public {
-        // Check initial reward distribution
-        assertEq(tracker.rewardsDistributed(arbiter), 0, "Arbiter should have no rewards");
-
-        // Expect revert due to no rewards available
-        vm.expectRevert("PurchaseTracker: No rewards to distribute");
-        vm.prank(arbiter);
-        tracker.distributeReward(arbiter);
-    }*/
 
     function deposit(address _depositor, IERC20 token, uint256 amount) private {
         vm.startPrank(_depositor); 
