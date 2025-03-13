@@ -5,7 +5,7 @@ import "./DeploymentSetup.t.sol";
 import "@hamza-escrow/security/HatsSecurityContext.sol";
 import "../src/tokens/GovernanceToken.sol";
 import "../src/HamzaGovernor.sol";
-import "../src/utils/TestToken.sol";
+import { TestToken as VotingTestToken } from "../src/utils/TestToken.sol";
 import "@hamza-escrow/SystemSettings.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
@@ -41,7 +41,7 @@ contract VotingTest is DeploymentSetup {
         
         // Use the existing securityContext, lootToken, and govToken from DeploymentSetup
         HatsSecurityContext securityContextLocal = HatsSecurityContext(hatsCtx);
-        TestToken lootTokenLocal = TestToken(lootToken);
+        VotingTestToken lootTokenLocal = VotingTestToken(lootToken);
         GovernanceToken govTokenLocal = GovernanceToken(govToken);
 
         // Mint loot tokens to voters
@@ -385,7 +385,7 @@ contract VotingTest is DeploymentSetup {
     
     // Test vote delegation functionality
     function testVoteDelegation() public {
-        TestToken lootTokenLocal = TestToken(lootToken);
+        VotingTestToken lootTokenLocal = VotingTestToken(lootToken);
         GovernanceToken govTokenLocal = GovernanceToken(govToken);
         
         // Delegate voter[1]'s votes to voter[0]

@@ -7,7 +7,9 @@ import "../src/PurchaseTracker.sol";
 import "@hamza-escrow/PaymentEscrow.sol" as EscrowLib;
 import "@hamza-escrow/security/Roles.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "@hamza-escrow/ISystemSettings.sol";
+import { TestToken as HamzaTestToken } from "@hamza-escrow/TestToken.sol";
 
 /**
  * @notice This test suite verifies that the PurchaseTracker is correctly updated
@@ -328,6 +330,201 @@ contract TestPaymentAndTracker is DeploymentSetup {
     //TODO: TEST: test that PurchaseRecorded event is emitted
     //TODO: TEST: test 'PurchaseTracker: Purchase already recorded' error 
 
+    /**
+     * @notice Tests the currency-specific tracking functionality added to PurchaseTracker
+     */
+    function testCurrencyBasedTracking() public {
+        // Create a second test token to test multiple currencies
+        HamzaTestToken secondToken = new HamzaTestToken("Second Test Token", "STT");
+        secondToken.mint(address(this), 1_000_000 ether);
+        secondToken.mint(payer, 10_000 ether);
+        secondToken.mint(payer1, 10_000 ether);
+        secondToken.mint(payer2, 10_000 ether);
+        
+        // Setup payment IDs and amounts
+        bytes32 paymentId1 = keccak256("currency-test-1");
+        bytes32 paymentId2 = keccak256("currency-test-2");
+        uint256 payAmount1 = 1000;
+        uint256 payAmount2 = 2000;
+        
+        // Place a payment using loot token
+        EscrowLib.Payment memory payment1 = placePayment(
+            payEscrow, paymentId1, payer, seller, address(loot), payAmount1
+        );
+        
+        // Place a payment using the second token
+        vm.startPrank(payer);
+        secondToken.approve(address(payEscrow), payAmount2);
+        vm.stopPrank();
+        
+        // Place payment with the second token
+        vm.startPrank(payer);
+        PaymentInput memory input = PaymentInput({
+            id: paymentId2,
+            payer: payer,
+            receiver: seller,
+            currency: address(secondToken),
+            amount: payAmount2
+        });
+        payEscrow.placePayment(input);
+        vm.stopPrank();
+        
+        // Release both escrows
+        releaseEscrow(payEscrow, paymentId1);
+        releaseEscrow(payEscrow, paymentId2);
+        
+        // Calculate expected net amounts after fees
+        uint256 feeBps = payEscrowSettingsFee();
+        uint256 expectedFee1 = (payAmount1 * feeBps) / 10000;
+        uint256 netAmount1 = payAmount1 - expectedFee1;
+        uint256 expectedFee2 = (payAmount2 * feeBps) / 10000;
+        uint256 netAmount2 = payAmount2 - expectedFee2;
+        
+        // Test total amounts
+        assertEq(tracker.totalPurchaseAmount(payer), netAmount1 + netAmount2, "Total purchase amount mismatch");
+        assertEq(tracker.totalSalesAmount(seller), netAmount1 + netAmount2, "Total sales amount mismatch");
+        
+        // Test currency-specific amounts
+        assertEq(tracker.getPurchaseAmountByCurrency(payer, address(loot)), netAmount1, "Loot token purchase amount mismatch");
+        assertEq(tracker.getPurchaseAmountByCurrency(payer, address(secondToken)), netAmount2, "Second token purchase amount mismatch");
+        
+        assertEq(tracker.getSalesAmountByCurrency(seller, address(loot)), netAmount1, "Loot token sales amount mismatch");
+        assertEq(tracker.getSalesAmountByCurrency(seller, address(secondToken)), netAmount2, "Second token sales amount mismatch");
+        
+        // Test with address with no purchases/sales in a specific currency
+        assertEq(tracker.getPurchaseAmountByCurrency(seller, address(loot)), 0, "Seller shouldn't have purchases");
+        assertEq(tracker.getSalesAmountByCurrency(payer, address(loot)), 0, "Payer shouldn't have sales");
+    }
+    
+    /**
+     * @notice Tests recording purchases in multiple currencies with the same user and verifies
+     * that both per-currency and total amounts are tracked correctly
+     */
+    function testMultipleCurrencyTracking() public {
+        // Create three test tokens
+        HamzaTestToken token1 = new HamzaTestToken("Token One", "TK1");
+        HamzaTestToken token2 = new HamzaTestToken("Token Two", "TK2");
+        HamzaTestToken token3 = new HamzaTestToken("Token Three", "TK3");
+        
+        // Mint tokens to test addresses
+        token1.mint(payer, 10_000 ether);
+        token2.mint(payer, 10_000 ether);
+        token3.mint(payer, 10_000 ether);
+        
+        // Setup payment data
+        bytes32[] memory paymentIds = new bytes32[](3);
+        paymentIds[0] = keccak256("multi-currency-1");
+        paymentIds[1] = keccak256("multi-currency-2");
+        paymentIds[2] = keccak256("multi-currency-3");
+        
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = 1000;
+        amounts[1] = 2000;
+        amounts[2] = 3000;
+        
+        address[] memory currencies = new address[](3);
+        currencies[0] = address(token1);
+        currencies[1] = address(token2);
+        currencies[2] = address(token3);
+        
+        // Place payments with different currencies
+        for (uint i = 0; i < 3; i++) {
+            vm.startPrank(payer);
+            IERC20(currencies[i]).approve(address(payEscrow), amounts[i]);
+            
+            PaymentInput memory input = PaymentInput({
+                id: paymentIds[i],
+                payer: payer,
+                receiver: seller,
+                currency: currencies[i],
+                amount: amounts[i]
+            });
+            payEscrow.placePayment(input);
+            vm.stopPrank();
+            
+            // Release escrow
+            releaseEscrow(payEscrow, paymentIds[i]);
+        }
+        
+        // Calculate expected net amounts after fees
+        uint256 feeBps = payEscrowSettingsFee();
+        uint256[] memory netAmounts = new uint256[](3);
+        uint256 totalNet = 0;
+        
+        for (uint i = 0; i < 3; i++) {
+            uint256 fee = (amounts[i] * feeBps) / 10000;
+            netAmounts[i] = amounts[i] - fee;
+            totalNet += netAmounts[i];
+        }
+        
+        // Check total amounts
+        assertEq(tracker.totalPurchaseAmount(payer), totalNet, "Total purchase amount mismatch");
+        assertEq(tracker.totalSalesAmount(seller), totalNet, "Total sales amount mismatch");
+        
+        // Check currency-specific amounts
+        for (uint i = 0; i < 3; i++) {
+            assertEq(
+                tracker.getPurchaseAmountByCurrency(payer, currencies[i]), 
+                netAmounts[i], 
+                string.concat("Currency ", Strings.toString(i), " purchase amount mismatch")
+            );
+            
+            assertEq(
+                tracker.getSalesAmountByCurrency(seller, currencies[i]), 
+                netAmounts[i], 
+                string.concat("Currency ", Strings.toString(i), " sales amount mismatch")
+            );
+        }
+    }
+    
+    /**
+     * @notice Tests recording native currency (ETH) purchases correctly
+     */
+    function testNativeCurrencyTracking() public {
+        // Setup payment with native currency (address(0))
+        bytes32 paymentId = keccak256("native-currency-test");
+        uint256 payAmount = 1 ether;
+        
+        // Ensure payer has enough ETH
+        vm.deal(payer, 10 ether);
+        
+        // Place payment with native currency
+        vm.startPrank(payer);
+        PaymentInput memory input = PaymentInput({
+            id: paymentId,
+            payer: payer,
+            receiver: seller,
+            currency: address(0), // Native currency
+            amount: payAmount
+        });
+        payEscrow.placePayment{value: payAmount}(input);
+        vm.stopPrank();
+        
+        // Release escrow
+        releaseEscrow(payEscrow, paymentId);
+        
+        // Calculate expected net amount after fees
+        uint256 feeBps = payEscrowSettingsFee();
+        uint256 expectedFee = (payAmount * feeBps) / 10000;
+        uint256 netAmount = payAmount - expectedFee;
+        
+        // Check total amounts
+        assertEq(tracker.totalPurchaseAmount(payer), netAmount, "Total purchase amount mismatch");
+        assertEq(tracker.totalSalesAmount(seller), netAmount, "Total sales amount mismatch");
+        
+        // Check native currency-specific amounts
+        assertEq(
+            tracker.getPurchaseAmountByCurrency(payer, address(0)), 
+            netAmount, 
+            "Native currency purchase amount mismatch"
+        );
+        
+        assertEq(
+            tracker.getSalesAmountByCurrency(seller, address(0)), 
+            netAmount, 
+            "Native currency sales amount mismatch"
+        );
+    }
 
     function payEscrowSettingsFee() internal view returns (uint256) {
         return systemSettings1.feeBps();
@@ -342,7 +539,15 @@ contract TestPaymentAndTracker is DeploymentSetup {
         uint256 amount
     ) private returns(EscrowLib.Payment memory) {
         vm.startPrank(payer);
-        loot.approve(address(_escrow), amount);
+        
+        // Use the appropriate token for approval
+        if (currency == address(0)) {
+            // Native ETH - no approval needed
+        } else if (currency == address(loot)) {
+            loot.approve(address(_escrow), amount);
+        } else {
+            IERC20(currency).approve(address(_escrow), amount);
+        }
 
         PaymentInput memory input = PaymentInput({
             id: paymentId,
@@ -351,7 +556,13 @@ contract TestPaymentAndTracker is DeploymentSetup {
             currency: currency,
             amount: amount
         });
-        _escrow.placePayment(input);
+        
+        if (currency == address(0)) {
+            _escrow.placePayment{value: amount}(input);
+        } else {
+            _escrow.placePayment(input);
+        }
+        
         vm.stopPrank();
 
         // 3. Fetch payment details

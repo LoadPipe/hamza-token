@@ -14,7 +14,7 @@ import "../src/GovernanceVault.sol";
 import "@hamza-escrow/SystemSettings.sol";
 import "@hamza-escrow/PaymentEscrow.sol";
 import "@hamza-escrow/EscrowMulticall.sol";
-import "@hamza-escrow/TestToken.sol";
+import { TestToken as HamzaTestToken } from "@hamza-escrow/TestToken.sol";
 
 import "../src/HamzaGovernor.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
@@ -451,7 +451,7 @@ contract DeployHamzaVault is Script {
     
     function deployTestToken() internal returns (address) {
         // Deploy TestToken with name and symbol
-        TestToken testToken = new TestToken("Hamza Test Token", "HTT");
+        HamzaTestToken testToken = new HamzaTestToken("Hamza Test Token", "HTT");
         
         // Store the address
         testTokenAddr = address(testToken);

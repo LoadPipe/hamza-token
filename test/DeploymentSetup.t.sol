@@ -21,6 +21,7 @@ contract DeploymentSetup is Test {
     address public systemSettings;
     address public purchaseTracker;
     address public escrow;
+    address public deployedTestToken;
     uint256 public adminHatId;
     address public admin;
     address public lootToken;
@@ -56,7 +57,7 @@ contract DeploymentSetup is Test {
 
         // Deploy contracts
         script = new DeployHamzaVault();
-        (baal, communityVault, govToken, govVault, safe, hatsCtx) = script.run();
+        (baal, communityVault, govToken, govVault, safe, hatsCtx, deployedTestToken) = script.run();
 
         // Initialize addresses
         adminHatId = script.adminHatId();
