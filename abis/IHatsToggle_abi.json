@@ -1,0 +1,21 @@
+[
+  {
+    "type": "function",
+    "name": "getHatStatus",
+    "inputs": [
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  }
+]
