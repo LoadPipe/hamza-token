@@ -1,5 +1,5 @@
 {
-    "mode": "Test",
+    "mode": "Deploy",
     "_comment": "Swap mode to Deploy for deployment. adds back in logs",
     "owners": {
         "ownerTwo": "0x1542612fee591eD35C05A3E980bAB325265c06a3",
