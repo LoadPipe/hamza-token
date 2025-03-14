@@ -12,16 +12,16 @@ import "./ICommunityRewardsCalculator.sol";
 contract CommunityRewardsCalculator is ICommunityRewardsCalculator {
     
     function getRewardsToDistribute(
-        address token, 
+        address /*token*/, 
         address[] calldata recipients,
         IPurchaseTracker purchaseTracker
-    ) external returns (uint256[] memory) {
+    ) external view returns (uint256[] memory) {
         uint256[] memory amounts = new uint256[](recipients.length);
 
         // for every purchase or sale made by the recipient, distribute 1 loot token
         for (uint i=0; i<recipients.length; i++) {
             uint256 totalPurchase = purchaseTracker.getPurchaseCount(recipients[i]);
-            uint256 totalSales = purchaseTracker.getSalesAmount(recipients[i]);
+            uint256 totalSales = purchaseTracker.getSalesCount(recipients[i]);
             uint256 totalRewards = totalPurchase + totalSales;
             amounts[i] = totalRewards;
         }
