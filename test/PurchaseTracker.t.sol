@@ -348,7 +348,7 @@ contract TestPaymentAndTracker is DeploymentSetup {
         uint256 payAmount2 = 2000;
         
         // Place a payment using loot token
-        EscrowLib.Payment memory payment1 = placePayment(
+        placePayment(
             payEscrow, paymentId1, payer, seller, address(loot), payAmount1
         );
         
