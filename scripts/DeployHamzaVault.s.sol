@@ -14,6 +14,7 @@ import "../src/GovernanceVault.sol";
 import "@hamza-escrow/SystemSettings.sol";
 import "@hamza-escrow/PaymentEscrow.sol";
 import "@hamza-escrow/EscrowMulticall.sol";
+import { TestToken as HamzaTestToken } from "@hamza-escrow/TestToken.sol";
 
 import "../src/HamzaGovernor.sol";
 import { HamzaGovernor } from "../src/HamzaGovernor.sol";
@@ -58,6 +59,9 @@ contract DeployHamzaVault is Script {
 
     address public escrowAddr;
     
+    // Add testToken address
+    address public testTokenAddr;
+    
     // Store these values to avoid stack depth issues
     address public safeAddr;
     address public hats;
@@ -75,7 +79,8 @@ contract DeployHamzaVault is Script {
             address governanceToken,
             address governanceVault,
             address _safeAddress,
-            address _hatsSecurityContext
+            address _hatsSecurityContext,
+            address testToken
         )
     {
         // 1) Read config file
@@ -138,6 +143,9 @@ contract DeployHamzaVault is Script {
         // 15-16) Deploy PurchaseTracker, PaymentEscrow, and EscrowMulticall
         deployEscrowContracts(ISecurityContext(hatsSecurityContextAddr), vault, lootTokenAddr);
         
+        // 17) Deploy TestToken
+        address _testTokenAddr = deployTestToken();
+        
         vm.stopBroadcast();
 
         if (keccak256(abi.encodePacked(mode)) == keccak256(abi.encodePacked("Deploy"))) {
@@ -146,7 +154,8 @@ contract DeployHamzaVault is Script {
                 vault,
                 govTokenAddr,
                 govVaultAddr,
-                timelockAddr
+                timelockAddr,
+                _testTokenAddr
             );
         }
 
@@ -157,7 +166,8 @@ contract DeployHamzaVault is Script {
             govTokenAddr,            // governanceToken
             govVaultAddr,            // governanceVault
             safeAddr,                // safeAddress
-            hatsSecurityContextAddr  // hatsSecurityContext
+            hatsSecurityContextAddr, // hatsSecurityContext
+            _testTokenAddr           // testToken
         );
     }
     
@@ -439,12 +449,26 @@ contract DeployHamzaVault is Script {
         new EscrowMulticall();
     }
     
+    function deployTestToken() internal returns (address) {
+        // Deploy TestToken with name and symbol
+        HamzaTestToken testToken = new HamzaTestToken("Hamza Test Token", "HTT");
+        
+        // Store the address
+        testTokenAddr = address(testToken);
+        
+        // Mint some tokens to OWNER_ONE for testing
+        testToken.mint(OWNER_ONE, 1000 * 10**18);
+        
+        return testTokenAddr;
+    }
+    
     function logDeployedAddresses(
         address newBaalAddr,
         address communityVault,
         address govTokenAddr,
         address govVaultAddr,
-        address timelockAddr
+        address timelockAddr,
+        address _testTokenAddr
     ) internal view {
         console2.log("Owner One (from PRIVATE_KEY):", OWNER_ONE);
         console2.log("Owner Two (from config):     ", OWNER_TWO);
@@ -464,6 +488,7 @@ contract DeployHamzaVault is Script {
         console2.log("Timelock deployed at:", timelockAddr);
         console2.log("PurchaseTracker deployed at:", purchaseTrackerAddr);
         console2.log("PaymentEscrow deployed at:", escrowAddr);
+        console2.log("TestToken deployed at:", _testTokenAddr);
         console2.log("-----------------------------------------------");
     }
 
