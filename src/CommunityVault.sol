@@ -14,9 +14,6 @@ import "./ICommunityRewardsCalculator.sol";
 contract CommunityVault is HasSecurityContext {
     using SafeERC20 for IERC20;
 
-    // Mapping to store token balances held in the community vault
-    mapping(address => uint256) public tokenBalances;
-
     // Keeps a count of already distributed rewards
     mapping(address => mapping(address => uint256)) public rewardsDistributed;
 
@@ -58,8 +55,6 @@ contract CommunityVault is HasSecurityContext {
             IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         }
 
-        tokenBalances[token] += amount;
-
         emit Deposit(token, msg.sender, amount);
     }
 
@@ -70,7 +65,7 @@ contract CommunityVault is HasSecurityContext {
      * @param amount The amount to withdraw
      */
     function withdraw(address token, address to, uint256 amount) external onlyRole(Roles.SYSTEM_ROLE) {
-        require(tokenBalances[token] >= amount, "Insufficient balance");
+        require(this.getBalance(token) >= amount, "Insufficient balance");
 
         if (token == address(0)) {
             // ETH withdrawal
@@ -80,8 +75,6 @@ contract CommunityVault is HasSecurityContext {
             // ERC20 withdrawal
             IERC20(token).safeTransfer(to, amount);
         }
-
-        tokenBalances[token] -= amount;
 
         emit Withdraw(token, to, amount);
     }
@@ -158,7 +151,8 @@ contract CommunityVault is HasSecurityContext {
      * @param token The address of the token
      */
     function getBalance(address token) external view returns (uint256) {
-        return tokenBalances[token];
+        if (token == address(0)) return (address(this)).balance;
+        return IERC20(token).balanceOf(address(this));
     }
 
     function _distributeRewards(address token, address[] memory recipients) internal {
@@ -181,7 +175,7 @@ contract CommunityVault is HasSecurityContext {
         require(recipients.length == amounts.length, "Mismatched arrays");
 
         for (uint256 i = 0; i < recipients.length; i++) {
-            require(tokenBalances[token] >= amounts[i], "Insufficient balance");
+            require(this.getBalance(token) >= amounts[i], "Insufficient balance");
 
             if (token == address(0)) {
                 // ETH distribution
@@ -191,9 +185,6 @@ contract CommunityVault is HasSecurityContext {
                 // ERC20 distribution
                 IERC20(token).safeTransfer(recipients[i], amounts[i]);
             }
-
-            // decrement balance 
-            tokenBalances[token] -= amounts[i];
 
             // record the distribution
             rewardsDistributed[token][recipients[i]] += amounts[i];
