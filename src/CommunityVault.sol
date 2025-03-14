@@ -157,10 +157,16 @@ contract CommunityVault is HasSecurityContext {
 
     function _distributeRewards(address token, address[] memory recipients) internal {
         if (address(rewardsCalculator) != address(0) && address(purchaseTracker) != address(0)) {
+            
+            // Create an array of already claimed rewards for each recipient
+            uint256[] memory claimedRewardsArray = new uint256[](recipients.length);
+            for (uint256 i = 0; i < recipients.length; i++) {
+                claimedRewardsArray[i] = rewardsDistributed[token][recipients[i]];
+            }
 
-            //get rewards to distribute
+            // Get rewards to distribute
             uint256[] memory amounts = rewardsCalculator.getRewardsToDistribute(
-                token, recipients, IPurchaseTracker(purchaseTracker)
+                token, recipients, IPurchaseTracker(purchaseTracker), claimedRewardsArray
             );
 
             _distribute(token, recipients, amounts);

@@ -14,8 +14,10 @@ contract CommunityRewardsCalculator is ICommunityRewardsCalculator {
     function getRewardsToDistribute(
         address /*token*/, 
         address[] calldata recipients,
-        IPurchaseTracker purchaseTracker
+        IPurchaseTracker purchaseTracker,
+        uint256[] calldata claimedRewards
     ) external view returns (uint256[] memory) {
+        require(recipients.length == claimedRewards.length, "Array lengths must match");
         uint256[] memory amounts = new uint256[](recipients.length);
 
         // for every purchase or sale made by the recipient, distribute 1 loot token
@@ -23,7 +25,13 @@ contract CommunityRewardsCalculator is ICommunityRewardsCalculator {
             uint256 totalPurchase = purchaseTracker.getPurchaseCount(recipients[i]);
             uint256 totalSales = purchaseTracker.getSalesCount(recipients[i]);
             uint256 totalRewards = totalPurchase + totalSales;
-            amounts[i] = totalRewards;
+            
+            // Subtract already claimed rewards to prevent double claiming
+            if (totalRewards > claimedRewards[i]) {
+                amounts[i] = totalRewards - claimedRewards[i];
+            } else {
+                amounts[i] = 0; // No new rewards to claim
+            }
         }
 
         return amounts;

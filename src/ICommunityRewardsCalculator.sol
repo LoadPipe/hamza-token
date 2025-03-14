@@ -12,6 +12,7 @@ interface ICommunityRewardsCalculator {
     function getRewardsToDistribute(
         address token, 
         address[] calldata recipients,
-        IPurchaseTracker purchaseTracker
-    ) external returns (uint256[] memory);
+        IPurchaseTracker purchaseTracker,
+        uint256[] calldata claimedRewards
+    ) external view returns (uint256[] memory);
 }
