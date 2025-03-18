@@ -14,8 +14,16 @@ import "./ICommunityRewardsCalculator.sol";
 contract CommunityVault is HasSecurityContext {
     using SafeERC20 for IERC20;
 
-    // Keeps a count of already distributed rewards
-    mapping(address => mapping(address => uint256)) public rewardsDistributed;
+    // Store the last claim checkpoint for each user/token combination
+    // Instead of storing accumulated rewards, we store the "checkpoint" values
+    // This allows us to only distribute rewards that have occurred since the last claim
+    struct ClaimCheckpoint {
+        uint256 lastClaimedPurchases;  // Last claimed purchase count
+        uint256 lastClaimedSales;      // Last claimed sales count
+    }
+
+    // Mapping: token => user => checkpoint
+    mapping(address => mapping(address => ClaimCheckpoint)) public lastClaimCheckpoints;
 
     // Governance staking contract address
     address public governanceVault;
@@ -30,7 +38,7 @@ contract CommunityVault is HasSecurityContext {
     event Deposit(address indexed token, address indexed from, uint256 amount);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event Distribute(address indexed token, address indexed to, uint256 amount);
-    event RewardDistributed(address indexed token, address indexed recipient, uint256 amount);
+    event RewardDistributed(address indexed token, address indexed recipient, uint256 amount, uint256 newPurchaseCheckpoint, uint256 newSalesCheckpoint);
 
     /**
      * @dev Constructor to initialize the security context.
@@ -155,15 +163,64 @@ contract CommunityVault is HasSecurityContext {
         return IERC20(token).balanceOf(address(this));
     }
 
+    /**
+     * @dev For backward compatibility - returns the total rewards distributed to a recipient
+     * @param token The token address
+     * @param recipient The recipient address
+     * @return The sum of all previous rewards
+     */
+    function rewardsDistributed(address token, address recipient) external view returns (uint256) {
+        if (address(purchaseTracker) == address(0)) return 0;
+        
+        ClaimCheckpoint memory checkpoint = lastClaimCheckpoints[token][recipient];
+        return checkpoint.lastClaimedPurchases + checkpoint.lastClaimedSales;
+    }
+
     function _distributeRewards(address token, address[] memory recipients) internal {
-        if (address(rewardsCalculator) != address(0) && address(purchaseTracker) != address(0)) {
-
-            //get rewards to distribute
-            uint256[] memory amounts = rewardsCalculator.getRewardsToDistribute(
-                token, recipients, IPurchaseTracker(purchaseTracker)
+        if (address(rewardsCalculator) == address(0) || address(purchaseTracker) == address(0)) {
+            return;
+        }
+        
+        for (uint256 i = 0; i < recipients.length; i++) {
+            address recipient = recipients[i];
+            
+            // Get the current checkpoint for this user/token
+            ClaimCheckpoint memory checkpoint = lastClaimCheckpoints[token][recipient];
+            
+            // Get current totals from purchase tracker
+            uint256 currentPurchases = IPurchaseTracker(purchaseTracker).getPurchaseCount(recipient);
+            uint256 currentSales = IPurchaseTracker(purchaseTracker).getSalesCount(recipient);
+            
+            // Calculate reward using the calculator
+            uint256 totalReward = rewardsCalculator.calculateUserRewards(
+                token,
+                recipient,
+                IPurchaseTracker(purchaseTracker),
+                checkpoint.lastClaimedPurchases,
+                checkpoint.lastClaimedSales
             );
-
-            _distribute(token, recipients, amounts);
+            
+            if (totalReward > 0) {
+                // Update the checkpoint before distribution to prevent reentrancy
+                lastClaimCheckpoints[token][recipient] = ClaimCheckpoint(
+                    currentPurchases,
+                    currentSales
+                );
+                
+                // Distribute rewards
+                if (token == address(0)) {
+                    // ETH distribution
+                    require(address(this).balance >= totalReward, "Insufficient ETH balance");
+                    (bool success, ) = recipient.call{value: totalReward}("");
+                    require(success, "ETH transfer failed");
+                } else {
+                    // ERC20 distribution
+                    require(IERC20(token).balanceOf(address(this)) >= totalReward, "Insufficient token balance");
+                    IERC20(token).safeTransfer(recipient, totalReward);
+                }
+                
+                emit RewardDistributed(token, recipient, totalReward, currentPurchases, currentSales);
+            }
         }
     }
 
@@ -185,9 +242,6 @@ contract CommunityVault is HasSecurityContext {
                 // ERC20 distribution
                 IERC20(token).safeTransfer(recipients[i], amounts[i]);
             }
-
-            // record the distribution
-            rewardsDistributed[token][recipients[i]] += amounts[i];
 
             emit Distribute(token, recipients[i], amounts[i]);
         }

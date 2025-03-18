@@ -542,6 +542,360 @@ contract TestCommunityVault is DeploymentSetup {
         assertEq(vault.rewardsDistributed(address(loot), seller), rewardsToDistribute, "Incorrect rewards tracked");
     }
 
+    function testClaimMultipleRewards() public {
+        bytes32 paymentId1 = keccak256("payment-reward-test-multiple-1");
+        uint256 payAmount = 500;
+
+        address buyer = depositor1;
+        address seller = recipient1;
+
+        PaymentEscrow payEscrow = PaymentEscrow(payable(escrow));
+
+        // Fund the vault with multiple token types for rewards
+        deposit(depositor2, loot, 100_000);
+        deposit(depositor3, IERC20(address(0)), 100_000);
+        deposit(depositor2, testToken, 100_000);
+
+        // Buyer makes a purchase with LOOT token
+        vm.startPrank(buyer);
+        loot.approve(address(payEscrow), payAmount);
+
+        PaymentInput memory input1 = PaymentInput({
+            id: paymentId1,
+            payer: buyer,
+            receiver: seller,
+            currency: address(loot),
+            amount: payAmount
+        });
+        payEscrow.placePayment(input1);
+        vm.stopPrank();
+
+        // Buyer and seller release escrow
+        vm.prank(buyer);
+        payEscrow.releaseEscrow(paymentId1);
+
+        if (!autoRelease) {
+            vm.prank(seller);
+            payEscrow.releaseEscrow(paymentId1);
+        }
+
+        // Validate purchase tracking
+        assertEq(tracker.totalPurchaseCount(buyer), 1, "Incorrect purchase count");
+        assertEq(tracker.totalSalesCount(seller), 1, "Incorrect sales count");
+
+        // Check initial reward balances
+        uint256 initialBuyerLootBalance = loot.balanceOf(buyer);
+        uint256 initialBuyerTestTokenBalance = testToken.balanceOf(buyer);
+        uint256 initialBuyerEthBalance = buyer.balance;
+        
+        uint256 expectedLootRewards = tracker.totalPurchaseCount(buyer);
+        
+        // First claim: Buyer claims LOOT rewards
+        vm.prank(buyer);
+        vault.claimRewards(address(loot));
+        
+        // Verify LOOT rewards were distributed
+        uint256 afterFirstClaimLootBalance = loot.balanceOf(buyer);
+        assertEq(afterFirstClaimLootBalance, initialBuyerLootBalance + expectedLootRewards, "Incorrect LOOT reward distribution");
+        assertEq(vault.rewardsDistributed(address(loot), buyer), expectedLootRewards, "Incorrect LOOT rewards tracked");
+        
+        // Second claim: Buyer claims LOOT rewards again (should not receive additional rewards)
+        vm.prank(buyer);
+        vault.claimRewards(address(loot));
+        
+        // Verify no additional LOOT rewards were distributed
+        assertEq(loot.balanceOf(buyer), afterFirstClaimLootBalance, "Additional LOOT rewards incorrectly distributed");
+        assertEq(vault.rewardsDistributed(address(loot), buyer), expectedLootRewards, "Incorrect LOOT rewards tracking after second claim");
+        
+        // First claim: Buyer claims test token rewards
+        vm.prank(buyer);
+        vault.claimRewards(address(testToken));
+        
+        // Verify test token rewards were distributed
+        uint256 afterFirstClaimTestTokenBalance = testToken.balanceOf(buyer);
+        assertEq(afterFirstClaimTestTokenBalance, initialBuyerTestTokenBalance + expectedLootRewards, "Incorrect test token reward distribution");
+        assertEq(vault.rewardsDistributed(address(testToken), buyer), expectedLootRewards, "Incorrect test token rewards tracked");
+        
+        // Second claim: Buyer claims test token rewards again (should not receive additional rewards)
+        vm.prank(buyer);
+        vault.claimRewards(address(testToken));
+        
+        // Verify no additional test token rewards were distributed
+        assertEq(testToken.balanceOf(buyer), afterFirstClaimTestTokenBalance, "Additional test token rewards incorrectly distributed");
+        assertEq(vault.rewardsDistributed(address(testToken), buyer), expectedLootRewards, "Incorrect test token rewards tracking after second claim");
+        
+        // First claim: Buyer claims ETH rewards
+        vm.prank(buyer);
+        vault.claimRewards(address(0));
+        
+        // Verify ETH rewards were distributed
+        uint256 afterFirstClaimEthBalance = buyer.balance;
+        assertEq(afterFirstClaimEthBalance, initialBuyerEthBalance + expectedLootRewards, "Incorrect ETH reward distribution");
+        assertEq(vault.rewardsDistributed(address(0), buyer), expectedLootRewards, "Incorrect ETH rewards tracked");
+        
+        // Second claim: Buyer claims ETH rewards again (should not receive additional rewards)
+        vm.prank(buyer);
+        vault.claimRewards(address(0));
+        
+        // Verify no additional ETH rewards were distributed
+        assertEq(buyer.balance, afterFirstClaimEthBalance, "Additional ETH rewards incorrectly distributed");
+        assertEq(vault.rewardsDistributed(address(0), buyer), expectedLootRewards, "Incorrect ETH rewards tracking after second claim");
+        
+        // Repeat the same test for the seller
+        uint256 initialSellerLootBalance = loot.balanceOf(seller);
+        uint256 expectedSellerRewards = tracker.totalSalesCount(seller);
+        
+        // First claim: Seller claims LOOT rewards
+        vm.prank(seller);
+        vault.claimRewards(address(loot));
+        
+        // Verify LOOT rewards were distributed to seller
+        uint256 afterFirstClaimSellerLootBalance = loot.balanceOf(seller);
+        assertEq(afterFirstClaimSellerLootBalance, initialSellerLootBalance + expectedSellerRewards, "Incorrect seller LOOT reward distribution");
+        assertEq(vault.rewardsDistributed(address(loot), seller), expectedSellerRewards, "Incorrect seller LOOT rewards tracked");
+        
+        // Second claim: Seller claims LOOT rewards again (should not receive additional rewards)
+        vm.prank(seller);
+        vault.claimRewards(address(loot));
+        
+        // Verify no additional LOOT rewards were distributed to seller
+        assertEq(loot.balanceOf(seller), afterFirstClaimSellerLootBalance, "Additional seller LOOT rewards incorrectly distributed");
+        assertEq(vault.rewardsDistributed(address(loot), seller), expectedSellerRewards, "Incorrect seller LOOT rewards tracking after second claim");
+        
+        // Try claiming multiple tokens in sequence
+        // Third claim (LOOT): Should not receive any additional rewards
+        vm.prank(buyer);
+        vault.claimRewards(address(loot));
+        assertEq(loot.balanceOf(buyer), afterFirstClaimLootBalance, "Additional LOOT rewards incorrectly distributed on third claim");
+        
+        // Third claim (Test Token): Should not receive any additional rewards
+        vm.prank(buyer);
+        vault.claimRewards(address(testToken));
+        assertEq(testToken.balanceOf(buyer), afterFirstClaimTestTokenBalance, "Additional test token rewards incorrectly distributed on third claim");
+        
+        // Third claim (ETH): Should not receive any additional rewards
+        vm.prank(buyer);
+        vault.claimRewards(address(0));
+        assertEq(buyer.balance, afterFirstClaimEthBalance, "Additional ETH rewards incorrectly distributed on third claim");
+    }
+
+    function testDoubleClaimBugDetection() public {
+        bytes32 paymentId1 = keccak256("payment-double-claim-test");
+        uint256 payAmount = 500;
+
+        address buyer = depositor1;
+        address seller = recipient1;
+
+        PaymentEscrow payEscrow = PaymentEscrow(payable(escrow));
+
+        // Fund the vault with tokens for rewards
+        deposit(depositor2, loot, 100_000);
+
+        // Check initial reward tracker states
+        uint256 initialBuyerRewardTracker = vault.rewardsDistributed(address(loot), buyer);
+        
+        // Make a purchase
+        vm.startPrank(buyer);
+        loot.approve(address(payEscrow), payAmount);
+        PaymentInput memory input = PaymentInput({
+            id: paymentId1,
+            payer: buyer,
+            receiver: seller,
+            currency: address(loot),
+            amount: payAmount
+        });
+        payEscrow.placePayment(input);
+        vm.stopPrank();
+
+        // Complete the transaction
+        vm.prank(buyer);
+        payEscrow.releaseEscrow(paymentId1);
+        if (!autoRelease) {
+            vm.prank(seller);
+            payEscrow.releaseEscrow(paymentId1);
+        }
+
+        // Check purchase tracking
+        assertEq(tracker.totalPurchaseCount(buyer), 1, "Incorrect purchase count");
+        
+        // Get initial balances
+        uint256 initialBuyerLootBalance = loot.balanceOf(buyer);
+        
+        // DEBUG: Log the inputs to getRewardsToDistribute before first claim
+        address[] memory recipients = new address[](1);
+        recipients[0] = buyer;
+        uint256[] memory claimedRewards = new uint256[](1);
+        claimedRewards[0] = vault.rewardsDistributed(address(loot), buyer);
+        
+        console.log("Before first claim - Buyer address:", buyer);
+        console.log("Before first claim - Total purchases:", tracker.totalPurchaseCount(buyer));
+        console.log("Before first claim - Previously claimed rewards:", claimedRewards[0]);
+        
+        // First claim
+        vm.prank(buyer);
+        vault.claimRewards(address(loot));
+        
+        // Check balances after first claim
+        uint256 afterFirstClaimLootBalance = loot.balanceOf(buyer);
+        uint256 firstClaimAmount = afterFirstClaimLootBalance - initialBuyerLootBalance;
+        uint256 afterFirstClaimRewardTracker = vault.rewardsDistributed(address(loot), buyer);
+        
+        console.log("After first claim - Rewards distributed:", afterFirstClaimRewardTracker - initialBuyerRewardTracker);
+        console.log("After first claim - Balance change:", firstClaimAmount);
+        
+        // Verify first claim worked correctly
+        assertGt(firstClaimAmount, 0, "First claim should give rewards");
+        assertEq(afterFirstClaimRewardTracker, initialBuyerRewardTracker + firstClaimAmount, "Rewards tracker should increase by claimed amount");
+        
+        // DEBUG: Log the inputs to getRewardsToDistribute before second claim 
+        claimedRewards[0] = vault.rewardsDistributed(address(loot), buyer);
+        console.log("Before second claim - Previously claimed rewards:", claimedRewards[0]);
+        
+        // Simulate block advancement (which might trigger reward recalculation)
+        vm.roll(block.number + 10);
+        vm.warp(block.timestamp + 3600); // Advance 1 hour
+        
+        // Second claim attempt - in the real world this seems to be paying out again
+        vm.prank(buyer);
+        vault.claimRewards(address(loot));
+        
+        // Check balances after second claim
+        uint256 afterSecondClaimLootBalance = loot.balanceOf(buyer);
+        uint256 secondClaimAmount = afterSecondClaimLootBalance - afterFirstClaimLootBalance;
+        uint256 afterSecondClaimRewardTracker = vault.rewardsDistributed(address(loot), buyer);
+        
+        console.log("After second claim - Rewards distributed:", afterSecondClaimRewardTracker - afterFirstClaimRewardTracker);
+        console.log("After second claim - Balance change:", secondClaimAmount);
+        
+        // This assertion is what we expect - but it might be failing in production
+        assertEq(secondClaimAmount, 0, "Second claim should NOT give additional rewards");
+        assertEq(afterSecondClaimRewardTracker, afterFirstClaimRewardTracker, "Rewards tracker should not increase after second claim");
+        
+        // DEBUGGING: Check what the rewards calculator is returning for the second claim
+        claimedRewards[0] = vault.rewardsDistributed(address(loot), buyer);
+        
+        // Debugging helper - directly inspect the rewards calculator if possible (requires additional helper function)
+        // This will simulate what happens when the second claim is processed
+        vm.prank(admin);
+        address[] memory debugRecipients = new address[](1);
+        debugRecipients[0] = buyer;
+        
+        // Call distributeRewards which will give us the debug logs
+        vault.distributeRewards(address(loot), debugRecipients);
+        
+        // Verify final state
+        uint256 finalLootBalance = loot.balanceOf(buyer);
+        uint256 finalRewardTracker = vault.rewardsDistributed(address(loot), buyer);
+        
+        console.log("Final reward tracker value:", finalRewardTracker);
+        console.log("Total balance change:", finalLootBalance - initialBuyerLootBalance);
+        
+        // This should still be true - buyer should only receive rewards once
+        assertEq(finalLootBalance, afterFirstClaimLootBalance, "No additional rewards should be given with debug distribution");
+    }
+    
+    function testClaimMultipleSamePerson() public {
+        bytes32 paymentId1 = keccak256("payment-self-transaction");
+        uint256 payAmount = 500;
+
+        // Same person is both buyer and seller
+        address buyerAndSeller = depositor1;
+
+        PaymentEscrow payEscrow = PaymentEscrow(payable(escrow));
+
+        // Fund the vault with multiple token types for rewards
+        deposit(depositor2, loot, 100_000);
+        deposit(depositor3, IERC20(address(0)), 100_000);
+        deposit(depositor2, testToken, 100_000);
+
+        // Person makes a purchase to themselves
+        vm.startPrank(buyerAndSeller);
+        loot.approve(address(payEscrow), payAmount);
+
+        PaymentInput memory input1 = PaymentInput({
+            id: paymentId1,
+            payer: buyerAndSeller,
+            receiver: buyerAndSeller, // Same address as buyer
+            currency: address(loot),
+            amount: payAmount
+        });
+        payEscrow.placePayment(input1);
+        vm.stopPrank();
+
+        // Complete the transaction (only needs to release once if autoRelease is true)
+        vm.prank(buyerAndSeller);
+        payEscrow.releaseEscrow(paymentId1);
+
+        if (!autoRelease) {
+            vm.prank(buyerAndSeller);
+            payEscrow.releaseEscrow(paymentId1);
+        }
+
+        // Validate purchase tracking - should increment both buyer and seller counts
+        assertEq(tracker.totalPurchaseCount(buyerAndSeller), 1, "Incorrect purchase count");
+        assertEq(tracker.totalSalesCount(buyerAndSeller), 1, "Incorrect sales count");
+
+        // Log debugging info
+        console.log("Self-transaction - Address:", buyerAndSeller);
+        console.log("Self-transaction - Total purchases:", tracker.totalPurchaseCount(buyerAndSeller));
+        console.log("Self-transaction - Total sales:", tracker.totalSalesCount(buyerAndSeller));
+        console.log("Self-transaction - Previously claimed rewards:", vault.rewardsDistributed(address(loot), buyerAndSeller));
+
+        // Check initial balance
+        uint256 initialBalance = loot.balanceOf(buyerAndSeller);
+        
+        // First claim: Should receive rewards for both buying and selling
+        vm.prank(buyerAndSeller);
+        vault.claimRewards(address(loot));
+        
+        // Verify first claim results
+        uint256 afterFirstClaimBalance = loot.balanceOf(buyerAndSeller);
+        uint256 firstClaimAmount = afterFirstClaimBalance - initialBalance;
+        
+        console.log("After first claim - Balance change:", firstClaimAmount);
+        console.log("After first claim - Rewards tracker:", vault.rewardsDistributed(address(loot), buyerAndSeller));
+        
+        // The person should get rewards for both buying and selling (total of 2)
+        // This is the expected behavior, but may be where the bug is happening
+        assertEq(firstClaimAmount, 2, "Should receive rewards for both buying and selling roles");
+        
+        // Second claim: attempt to claim again
+        vm.roll(block.number + 10);  // Advance blocks to simulate real conditions
+        vm.warp(block.timestamp + 3600);  // Advance time
+        
+        vm.prank(buyerAndSeller);
+        vault.claimRewards(address(loot));
+        
+        // Verify second claim results
+        uint256 afterSecondClaimBalance = loot.balanceOf(buyerAndSeller);
+        uint256 secondClaimAmount = afterSecondClaimBalance - afterFirstClaimBalance;
+        
+        console.log("After second claim - Balance change:", secondClaimAmount);
+        console.log("After second claim - Rewards tracker:", vault.rewardsDistributed(address(loot), buyerAndSeller));
+        
+        // Should not receive additional rewards
+        assertEq(secondClaimAmount, 0, "Should not receive additional rewards on second claim");
+        
+        // Third claim: attempt to claim once more
+        vm.roll(block.number + 20);  // Advance more blocks
+        vm.warp(block.timestamp + 7200);  // Advance more time
+        
+        vm.prank(buyerAndSeller);
+        vault.claimRewards(address(loot));
+        
+        // Verify third claim results
+        uint256 afterThirdClaimBalance = loot.balanceOf(buyerAndSeller);
+        uint256 thirdClaimAmount = afterThirdClaimBalance - afterSecondClaimBalance;
+        
+        console.log("After third claim - Balance change:", thirdClaimAmount);
+        console.log("After third claim - Rewards tracker:", vault.rewardsDistributed(address(loot), buyerAndSeller));
+        
+        // Should not receive additional rewards
+        assertEq(thirdClaimAmount, 0, "Should not receive additional rewards on third claim");
+        
+        // Verify final state
+        assertEq(vault.rewardsDistributed(address(loot), buyerAndSeller), 2, "Total rewards distributed should be 2");
+    }
 
     function deposit(address _depositor, IERC20 token, uint256 amount) private {
         vm.startPrank(_depositor); 
