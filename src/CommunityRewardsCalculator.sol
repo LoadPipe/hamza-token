@@ -11,6 +11,9 @@ import "./ICommunityRewardsCalculator.sol";
  */
 contract CommunityRewardsCalculator is ICommunityRewardsCalculator {
     
+    /**
+     * @notice Legacy method for backwards compatibility
+     */
     function getRewardsToDistribute(
         address /*token*/, 
         address[] calldata recipients,
@@ -35,5 +38,31 @@ contract CommunityRewardsCalculator is ICommunityRewardsCalculator {
         }
 
         return amounts;
+    }
+    
+    /**
+     * @notice Calculate rewards for a single user based on their purchase/sales activity and checkpoint
+     * @dev This is the newer, more gas-efficient implementation that works with checkpoints
+     */
+    function calculateUserRewards(
+        address /*token*/,
+        address user,
+        IPurchaseTracker purchaseTracker,
+        uint256 lastClaimedPurchases,
+        uint256 lastClaimedSales
+    ) external view returns (uint256) {
+        // Get current purchase and sales counts
+        uint256 currentPurchases = purchaseTracker.getPurchaseCount(user);
+        uint256 currentSales = purchaseTracker.getSalesCount(user);
+        
+        // Calculate new (unclaimed) purchases and sales
+        uint256 newPurchases = currentPurchases > lastClaimedPurchases ?
+            currentPurchases - lastClaimedPurchases : 0;
+            
+        uint256 newSales = currentSales > lastClaimedSales ?
+            currentSales - lastClaimedSales : 0;
+        
+        // Return the total rewards (1 token per purchase/sale)
+        return newPurchases + newSales;
     }
 }
