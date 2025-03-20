@@ -1,0 +1,31 @@
+[
+  {
+    "type": "function",
+    "name": "getWearerStatus",
+    "inputs": [
+      {
+        "name": "_wearer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "eligible",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "standing",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  }
+]

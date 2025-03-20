@@ -1,0 +1,255 @@
+[
+  {
+    "type": "function",
+    "name": "buildHatId",
+    "inputs": [
+      {
+        "name": "_admin",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_newHat",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "getAdminAtLevel",
+    "inputs": [
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_level",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "admin",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getAdminAtLocalLevel",
+    "inputs": [
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_level",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "admin",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "getHatLevel",
+    "inputs": [
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "level",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getLocalHatLevel",
+    "inputs": [
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "level",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "getTippyTopHatDomain",
+    "inputs": [
+      {
+        "name": "_topHatDomain",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "domain",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getTopHatDomain",
+    "inputs": [
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "domain",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isLocalTopHat",
+    "inputs": [
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "_localTopHat",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "isTopHat",
+    "inputs": [
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "_topHat",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isValidHatId",
+    "inputs": [
+      {
+        "name": "_hatId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "validHatId",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "noCircularLinkage",
+    "inputs": [
+      {
+        "name": "_topHatDomain",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "_linkedAdmin",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "notCircular",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "sameTippyTopHatDomain",
+    "inputs": [
+      {
+        "name": "_topHatDomain",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "_newAdminHat",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sameDomain",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  }
+]
