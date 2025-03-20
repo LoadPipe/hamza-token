@@ -327,8 +327,146 @@ contract TestPaymentAndTracker is DeploymentSetup {
         assertEq(tracker.totalSalesAmount(seller), netAmount, "Seller sales total mismatch");
     }
 
-    //TODO: TEST: test that PurchaseRecorded event is emitted
-    //TODO: TEST: test 'PurchaseTracker: Purchase already recorded' error 
+    // Test that PurchaseRecorded event is emitted correctly
+    function testPurchaseRecordedEvent() public {
+        bytes32 paymentId = keccak256("event-test");
+        uint256 amount = 1000;
+        address currency = address(loot);
+        
+        // Authorize this test contract to call recordPurchase directly
+        vm.prank(admin);
+        tracker.authorizeEscrow(address(this));
+        
+        // Expect the PurchaseRecorded event to be emitted with specific parameters
+        vm.expectEmit(true, true, false, true, address(tracker));
+        emit PurchaseTracker.PurchaseRecorded(paymentId, payer, amount, currency);
+        
+        // Call recordPurchase directly
+        tracker.recordPurchase(paymentId, seller, payer, amount, currency);
+    }
+    
+    // Test that a purchase cannot be recorded twice with the same paymentId
+    function testCannotRecordPurchaseTwice() public {
+        bytes32 paymentId = keccak256("duplicate-test");
+        uint256 amount = 1000;
+        
+        // Authorize this test contract
+        vm.prank(admin);
+        tracker.authorizeEscrow(address(this));
+        
+        // Record the purchase once
+        tracker.recordPurchase(paymentId, seller, payer, amount, address(loot));
+        
+        // Attempt to record it again with the same paymentId
+        vm.expectRevert("PurchaseTracker: Purchase already recorded");
+        tracker.recordPurchase(paymentId, seller, payer, amount, address(loot));
+    }
+    
+    // Test recording a zero amount purchase
+    function testZeroAmountPurchase() public {
+        bytes32 paymentId = keccak256("zero-amount-test");
+        uint256 amount = 0;
+        
+        // Authorize this test contract
+        vm.prank(admin);
+        tracker.authorizeEscrow(address(this));
+        
+        // Record a purchase with zero amount
+        tracker.recordPurchase(paymentId, seller, payer, amount, address(loot));
+        
+        // Verify the purchase was recorded with zero amount
+        assertEq(tracker.totalPurchaseCount(payer), 1, "Purchase count should increase");
+        assertEq(tracker.totalPurchaseAmount(payer), 0, "Purchase amount should be zero");
+        assertEq(tracker.totalSalesCount(seller), 1, "Sales count should increase");
+        assertEq(tracker.totalSalesAmount(seller), 0, "Sales amount should be zero");
+    }
+    
+    // Test the direct view functions
+    function testViewFunctions() public {
+        bytes32 paymentId1 = keccak256("view-test-1");
+        bytes32 paymentId2 = keccak256("view-test-2");
+        uint256 amount1 = 1000;
+        uint256 amount2 = 2000;
+        address currency = address(loot);
+        
+        // Authorize this test contract
+        vm.prank(admin);
+        tracker.authorizeEscrow(address(this));
+        
+        // Record some purchases
+        tracker.recordPurchase(paymentId1, seller, payer, amount1, currency);
+        tracker.recordPurchase(paymentId2, seller, payer, amount2, currency);
+        
+        // Test the direct view functions
+        assertEq(tracker.getPurchaseCount(payer), 2, "getPurchaseCount mismatch");
+        assertEq(tracker.getPurchaseAmount(payer), amount1 + amount2, "getPurchaseAmount mismatch");
+        assertEq(tracker.getSalesCount(seller), 2, "getSalesCount mismatch");
+        assertEq(tracker.getSalesAmount(seller), amount1 + amount2, "getSalesAmount mismatch");
+        assertEq(tracker.getPurchaseAmountByCurrency(payer, currency), amount1 + amount2, 
+            "getPurchaseAmountByCurrency mismatch");
+        assertEq(tracker.getSalesAmountByCurrency(seller, currency), amount1 + amount2, 
+            "getSalesAmountByCurrency mismatch");
+    }
+    
+    // Test the legacy recordPurchase function (without currency parameter)
+    function testLegacyRecordPurchaseFunction() public {
+        bytes32 paymentId = keccak256("legacy-test");
+        uint256 amount = 1500;
+        
+        // Authorize this test contract
+        vm.prank(admin);
+        tracker.authorizeEscrow(address(this));
+        
+        // Use the legacy function (without currency parameter)
+        tracker.recordPurchase(paymentId, seller, payer, amount);
+        
+        // Verify purchase was recorded with address(0) as currency
+        assertEq(tracker.totalPurchaseCount(payer), 1, "Purchase count should increase");
+        assertEq(tracker.totalPurchaseAmount(payer), amount, "Purchase amount mismatch");
+        assertEq(tracker.getPurchaseAmountByCurrency(payer, address(0)), amount, 
+            "Currency-specific amount mismatch");
+    }
+    
+    // Test with extremely large purchase amounts
+    function testLargePurchaseAmounts() public {
+        bytes32 paymentId = keccak256("large-amount-test");
+        uint256 largeAmount = type(uint128).max; // Very large but not overflowing
+        
+        // Authorize this test contract
+        vm.prank(admin);
+        tracker.authorizeEscrow(address(this));
+        
+        // Record a purchase with a large amount
+        tracker.recordPurchase(paymentId, seller, payer, largeAmount, address(loot));
+        
+        // Verify the large amount was recorded correctly
+        assertEq(tracker.getPurchaseAmount(payer), largeAmount, "Large purchase amount not recorded correctly");
+        assertEq(tracker.getSalesAmount(seller), largeAmount, "Large sales amount not recorded correctly");
+    }
+    
+    // Test purchase details storage and retrieval
+    function testPurchaseDetailsStorage() public {
+        bytes32 paymentId = keccak256("details-test");
+        uint256 amount = 1000;
+        address currency = address(loot);
+        
+        // Authorize this test contract
+        vm.prank(admin);
+        tracker.authorizeEscrow(address(this));
+        
+        // Record a purchase
+        tracker.recordPurchase(paymentId, seller, payer, amount, currency);
+        
+        // Retrieve and verify the stored purchase details
+        (address storedSeller, address storedBuyer, uint256 storedAmount, address storedCurrency, bool recorded) = 
+            tracker.purchases(paymentId);
+        
+        assertEq(storedSeller, seller, "Seller not stored correctly");
+        assertEq(storedBuyer, payer, "Buyer not stored correctly");
+        assertEq(storedAmount, amount, "Amount not stored correctly");
+        assertEq(storedCurrency, currency, "Currency not stored correctly");
+        assertTrue(recorded, "Purchase should be marked as recorded");
+    }
 
     /**
      * @notice Tests the currency-specific tracking functionality added to PurchaseTracker
