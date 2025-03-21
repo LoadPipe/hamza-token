@@ -1,0 +1,56 @@
+CommunityVaultTest
+├── When initialized
+│   ├── It should set the security context.
+│   └── It should revert if security context is zero address.
+├── When deposit is called
+│   ├── When depositing ETH
+│   │   ├── It should accept ETH when msg.value matches amount.
+│   │   └── It should revert if msg.value does not match amount.
+│   └── When depositing ERC20
+│       └── It should transfer tokens from sender and update balance.
+├── When withdraw is called
+│   ├── When caller has SYSTEM_ROLE for withdraw
+│   │   ├── When withdrawing ETH
+│   │   │   ├── It should send ETH to recipient.
+│   │   │   └── It should revert if ETH transfer fails.
+│   │   ├── When withdrawing ERC20
+│   │   │   └── It should transfer tokens and reduce balance.
+│   │   └── It should revert if insufficient balance.
+│   └── When caller lacks SYSTEM_ROLE for withdraw
+│       └── It should revert.
+├── When distribute is called
+│   ├── When caller has SYSTEM_ROLE for distribute
+│   │   ├── It should distribute tokens to recipients.
+│   │   └── It should revert if recipients and amounts mismatch.
+│   └── When caller lacks SYSTEM_ROLE for distribute
+│       └── It should revert.
+├── When distributeRewards is called
+│   ├── When caller has SYSTEM_ROLE for distributeRewards
+│   │   ├── When rewardsCalculator and purchaseTracker are set
+│   │   │   └── It should calculate and distribute rewards.
+│   │   └── When rewardsCalculator or purchaseTracker not set
+│   │       └── It should do nothing.
+│   └── When caller lacks SYSTEM_ROLE for distributeRewards
+│       └── It should revert.
+├── When claimRewards is called
+│   └── It should distribute rewards to msg.sender using rewardsCalculator.
+├── When setGovernanceVault is called
+│   ├── When caller has SYSTEM_ROLE for governanceVault
+│   │   ├── It should set the governanceVault address.
+│   │   ├── It should approve lootToken with max allowance.
+│   │   └── It should revert if vault or lootToken is zero.
+│   └── When caller lacks SYSTEM_ROLE for governanceVault
+│       └── It should revert.
+├── When setPurchaseTracker is called
+│   ├── When caller has SYSTEM_ROLE for purchaseTracker
+│   │   ├── It should set the purchase tracker.
+│   │   └── It should revert if address is zero.
+│   └── When caller lacks SYSTEM_ROLE for purchaseTracker
+│       └── It should revert.
+├── When setCommunityRewardsCalculator is called
+│   ├── When caller has SYSTEM_ROLE for rewardsCalculator
+│   │   └── It should set the rewards calculator.
+│   └── When caller lacks SYSTEM_ROLE for rewardsCalculator
+│       └── It should revert.
+└── When getBalance is called
+    └── It should return the correct token balance.
