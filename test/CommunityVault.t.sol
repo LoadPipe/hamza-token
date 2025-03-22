@@ -197,7 +197,52 @@ contract TestCommunityVault is DeploymentSetup {
     
     // Test that deposit behaves correctly when balance too low 
     function testDepositOverLimit() public {
-        //TODO: testDepositOverLimit
+        // Test with ERC20 token
+        TestToken smallBalanceToken = new TestToken("Small Balance Token", "SBT");
+        smallBalanceToken.mint(depositor1, 100); // Small initial balance
+        
+        uint256 overLimitAmount = 200; // More than what we minted
+        
+        // Record balances before
+        uint256 initialDepositorBalance = smallBalanceToken.balanceOf(depositor1);
+        uint256 initialVaultBalance = smallBalanceToken.balanceOf(address(vault));
+        
+        // Attempt to deposit more than the balance
+        vm.startPrank(depositor1);
+        smallBalanceToken.approve(address(vault), overLimitAmount);
+        
+        // This should revert, but we'll catch the revert and verify balances instead
+        bool success = false;
+        try vault.deposit(address(smallBalanceToken), overLimitAmount) {
+            success = true;
+        } catch {
+            // Expected to fail
+        }
+        vm.stopPrank();
+        
+        // Verify the deposit failed
+        assertFalse(success, "Deposit should have failed");
+        assertEq(smallBalanceToken.balanceOf(depositor1), initialDepositorBalance, "Depositor balance should not change");
+        assertEq(smallBalanceToken.balanceOf(address(vault)), initialVaultBalance, "Vault balance should not change");
+        
+        // Test with ETH
+        uint256 initialEthBalance = depositor1.balance;
+        uint256 initialVaultEthBalance = address(vault).balance;
+        
+        // Try to deposit more ETH than available
+        vm.startPrank(depositor1);
+        success = false;
+        try vault.deposit{value: initialEthBalance + 1 ether}(address(0), initialEthBalance + 1 ether) {
+            success = true;
+        } catch {
+            // Expected to fail
+        }
+        vm.stopPrank();
+        
+        // Verify the ETH deposit failed
+        assertFalse(success, "ETH deposit should have failed");
+        assertEq(depositor1.balance, initialEthBalance, "Depositor ETH balance should not change");
+        assertEq(address(vault).balance, initialVaultEthBalance, "Vault ETH balance should not change");
     }
     
     // Test that withdraw Insufficient Balance error 
@@ -215,17 +260,88 @@ contract TestCommunityVault is DeploymentSetup {
     
     // Test that withdraw transfers token correctly
     function testWithdrawTransfersTokens() public {
-        //TODO: testWithdrawTransfersTokens
+        uint256 depositAmount = 1000;
+        uint256 withdrawAmount = 500;
+        
+        // Initial balances
+        uint256 initialVaultLootBalance = loot.balanceOf(address(vault));
+        uint256 initialRecipientLootBalance = loot.balanceOf(recipient1);
+        
+        // Deposit tokens first
+        deposit(depositor1, IERC20(loot), depositAmount);
+        
+        // Withdraw tokens
+        vm.prank(admin);
+        vault.withdraw(address(loot), recipient1, withdrawAmount);
+        
+        // Check balances after withdrawal
+        assertEq(loot.balanceOf(address(vault)), initialVaultLootBalance + depositAmount - withdrawAmount);
+        assertEq(loot.balanceOf(recipient1), initialRecipientLootBalance + withdrawAmount);
+        
+        // Test with ETH
+        uint256 initialVaultEthBalance = address(vault).balance;
+        uint256 initialRecipientEthBalance = recipient1.balance;
+        
+        // Deposit ETH first
+        deposit(depositor1, IERC20(address(0)), depositAmount);
+        
+        // Withdraw ETH
+        vm.prank(admin);
+        vault.withdraw(address(0), recipient1, withdrawAmount);
+        
+        // Check balances after withdrawal
+        assertEq(address(vault).balance, initialVaultEthBalance + depositAmount - withdrawAmount);
+        assertEq(recipient1.balance, initialRecipientEthBalance + withdrawAmount);
     }
     
     // Test that withdraw emits Withdraw event
     function testWithdrawEmitsEvent() public {
-        //TODO: testWithdrawEmitsEvent
+        uint256 depositAmount = 1000;
+        uint256 withdrawAmount = 500;
+        
+        // Deposit tokens first
+        deposit(depositor1, IERC20(loot), depositAmount);
+        
+        // Verify Withdraw event is emitted correctly
+        vm.startPrank(admin);
+        vm.expectEmit(false, false, false, false);
+        emit CommunityVault.Withdraw(address(loot), recipient1, withdrawAmount);
+        vault.withdraw(address(loot), recipient1, withdrawAmount);
+        vm.stopPrank();
+        
+        // Same test with ETH
+        deposit(depositor1, IERC20(address(0)), depositAmount);
+        
+        vm.startPrank(admin);
+        vm.expectEmit(false, false, false, false);
+        emit CommunityVault.Withdraw(address(0), recipient1, withdrawAmount);
+        vault.withdraw(address(0), recipient1, withdrawAmount);
+        vm.stopPrank();
     }
     
     // Test that withdraw behaves correctly when balance too low 
     function testWithdrawOverLimit() public {
-        //TODO: testWithdrawOverLimit
+        // Use testToken instead of loot to have a clean starting balance
+        uint256 initialVaultBalance = testToken.balanceOf(address(vault));
+        uint256 depositAmount = 1000;
+        
+        // Deposit tokens first
+        deposit(depositor1, IERC20(address(testToken)), depositAmount);
+        
+        // Attempt to withdraw more than available
+        vm.startPrank(admin);
+        vm.expectRevert("Insufficient balance");
+        vault.withdraw(address(testToken), recipient1, initialVaultBalance + depositAmount + 1);
+        vm.stopPrank();
+        
+        // Same test with ETH
+        initialVaultBalance = address(vault).balance;
+        deposit(depositor1, IERC20(address(0)), depositAmount);
+        
+        vm.startPrank(admin);
+        vm.expectRevert("Insufficient balance");
+        vault.withdraw(address(0), recipient1, initialVaultBalance + depositAmount + 1);
+        vm.stopPrank();
     }
     
     // Test that withdraw is only callable if authorized
@@ -326,7 +442,40 @@ contract TestCommunityVault is DeploymentSetup {
 
     // Test that distribute handles insufficient balances correctly
     function testDistributeInsufficientBalance() public {
-        //TODO: testDistributeInsufficientBalance
+        // Use testToken instead of loot to have a clean starting balance
+        uint256 initialVaultBalance = testToken.balanceOf(address(vault));
+        uint256 depositAmount = 1000;
+        
+        // Deposit tokens first
+        deposit(depositor1, IERC20(address(testToken)), depositAmount);
+        
+        // Prepare distribution data
+        address[] memory recipients = new address[](3);
+        recipients[0] = recipient1;
+        recipients[1] = recipient2;
+        recipients[2] = recipient3;
+        
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = initialVaultBalance + depositAmount + 1; // More than total available
+        amounts[1] = 0;
+        amounts[2] = 0;
+        
+        // Attempt to distribute more than available
+        vm.startPrank(admin);
+        vm.expectRevert("Insufficient balance");
+        vault.distribute(address(testToken), recipients, amounts);
+        vm.stopPrank();
+        
+        // Same test with ETH
+        initialVaultBalance = address(vault).balance;
+        deposit(depositor1, IERC20(address(0)), depositAmount);
+        
+        amounts[0] = initialVaultBalance + depositAmount + 1; // More than total available
+        
+        vm.startPrank(admin);
+        vm.expectRevert("Insufficient balance");
+        vault.distribute(address(0), recipients, amounts);
+        vm.stopPrank();
     }
     
     // Test that distribute emits Distribute event 
@@ -911,5 +1060,88 @@ contract TestCommunityVault is DeploymentSetup {
         }
 
         vm.stopPrank();
+    }
+}
+
+// Mock token that can be configured to fail on transfers
+contract MockFailingToken {
+    string public name;
+    string public symbol;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+    bool public transferShouldFail;
+    
+    constructor(string memory _name, string memory _symbol) {
+        name = _name;
+        symbol = _symbol;
+    }
+    
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+    
+    function setTransferShouldFail(bool _shouldFail) external {
+        transferShouldFail = _shouldFail;
+    }
+    
+    function transfer(address to, uint256 amount) external returns (bool) {
+        if (transferShouldFail) {
+            return false;
+        }
+        
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+    
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        if (transferShouldFail) {
+            return false;
+        }
+        
+        allowance[from][msg.sender] -= amount;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+    
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
+    }
+}
+
+// Mock rewards calculator that returns huge reward amounts
+contract MockHugeRewardsCalculator is ICommunityRewardsCalculator {
+    function calculateUserRewards(
+        address token,
+        address user,
+        IPurchaseTracker purchaseTracker,
+        uint256 lastClaimedPurchases,
+        uint256 lastClaimedSales
+    ) external pure override returns (uint256) {
+        // Return a very large number to force insufficient balance
+        return type(uint128).max;
+    }
+    
+    function getRewardsToDistribute(
+        address token, 
+        address[] calldata recipients,
+        IPurchaseTracker purchaseTracker,
+        uint256[] calldata claimedRewards
+    ) external pure override returns (uint256[] memory) {
+        // Return max rewards for each recipient
+        uint256[] memory rewards = new uint256[](recipients.length);
+        for (uint256 i = 0; i < recipients.length; i++) {
+            rewards[i] = type(uint128).max;
+        }
+        return rewards;
+    }
+}
+
+// Contract that rejects ETH transfers
+contract EthRejecter {
+    receive() external payable {
+        revert("I reject ETH");
     }
 }
